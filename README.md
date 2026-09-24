@@ -11,6 +11,9 @@ for reusable extensions.
   tool-use rules.
 - **`doc-authoring`** — helps create and maintain internal, agent-facing project
   documentation.
+- **`gitauto`** — provides guarded Git delivery slash commands for branching,
+  verifying, committing, pushing, pull requests, CI, merging, cleanup, and
+  tagging, plus a full `ship` flow.
 - **`go-idioms`** — provides Effective Go and idiomatic Go guidance for writing,
   reviewing, and refactoring Go code.
 
