@@ -6,6 +6,22 @@
     "email": "contact@andresbott.com"
   },
   "description": "Claude Code extensions marketplace",
-  "version": "0.1.0",
-  "plugins": []
+  "version": "0.1.1",
+  "plugins": [
+    {
+      "name": "coding-guides",
+      "source": "./plugins/coding-guides",
+      "description": "Injects standing coding conventions and enforces selected tool-use rules."
+    },
+    {
+      "name": "doc-authoring",
+      "source": "./plugins/doc-authoring",
+      "description": "Skills for maintaining internal, agent-facing project documentation."
+    },
+    {
+      "name": "go-idioms",
+      "source": "./plugins/go-idioms",
+      "description": "Go best-practice skills covering Effective Go and idiomatic patterns."
+    }
+  ]
 }

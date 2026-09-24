@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "go-idioms",
+  "description": "Go best-practice skills: Effective Go conventions and idiomatic Go patterns, applied when writing, reviewing, or refactoring Go.",
+  "version": "0.1.1",
+  "author": {
+    "name": "Andres Bott",
+    "email": "contact@andresbott.com"
+  }
+}

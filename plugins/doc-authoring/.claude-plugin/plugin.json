@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "doc-authoring",
+  "description": "Skills for creating and maintaining internal, agent-facing project documentation (docs/agents/).",
+  "version": "0.1.1",
+  "author": {
+    "name": "Andres Bott",
+    "email": "contact@andresbott.com"
+  }
+}

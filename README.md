@@ -1,8 +1,16 @@
 # ai-extension-collection
 
 A [Claude Code plugin marketplace](https://code.claude.com/docs/en/plugin-marketplaces)
-for reusable extensions. The repository currently contains the marketplace
-scaffolding and no published plugins.
+for reusable extensions.
+
+## Available plugins
+
+- **`coding-guides`** — injects standing coding conventions and enforces selected
+  tool-use rules.
+- **`doc-authoring`** — helps create and maintain internal, agent-facing project
+  documentation.
+- **`go-idioms`** — provides Effective Go and idiomatic Go guidance for writing,
+  reviewing, and refactoring Go code.
 
 ## Add the marketplace
 
