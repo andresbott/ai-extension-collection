@@ -6,8 +6,13 @@
     "email": "contact@andresbott.com"
   },
   "description": "Claude Code extensions marketplace",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "plugins": [
+    {
+      "name": "architects",
+      "source": "./plugins/architects",
+      "description": "Specialist architecture agents for Go, Vue and TypeScript, OpenAPI, dependency layering, and project setup validation."
+    },
     {
       "name": "coding-guides",
       "source": "./plugins/coding-guides",

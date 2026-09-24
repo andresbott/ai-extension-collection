@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "architects",
+  "description": "A small team of subagents with distinct personalities: Pike (Go architecture), Natalia (TypeScript / Vue 3 / TanStack Query / PrimeVue architecture), Tony (OpenAPI / REST API design & spec), Evans (layering & dependency-direction review), and Margaret (setup & tech-stack checklist validation). The architects review and design (and implement when asked); Evans and Margaret are read-only — Evans audits layer boundaries and dependency direction, Margaret audits a project against a setup checklist.",
+  "version": "0.3.0",
+  "author": {
+    "name": "Andres Bott",
+    "email": "contact@andresbott.com"
+  }
+}
