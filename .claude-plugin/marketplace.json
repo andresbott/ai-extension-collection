@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "ai-extension-collection",
+  "owner": {
+    "name": "Andres Bott",
+    "email": "contact@andresbott.com"
+  },
+  "description": "Claude Code extensions marketplace",
+  "version": "0.1.0",
+  "plugins": []
+}

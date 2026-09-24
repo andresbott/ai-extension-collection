@@ -1,0 +1,101 @@
+name: version-bump-check
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-version-bumps:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out pull request history
+        # actions/checkout v4.2.2
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify required version bumps
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          version_at() {
+            git show "$1:$2" 2>/dev/null \
+              | jq -r '.version // empty' 2>/dev/null \
+              || true
+          }
+
+          is_bumped() {
+            latest="$(printf '%s\n%s\n' "$1" "$2" \
+              | sort -V \
+              | tail -n1)"
+            [ "$1" != "$2" ] && [ "$latest" = "$1" ]
+          }
+
+          fail=0
+          marketplace=".claude-plugin/marketplace.json"
+          base_marketplace_version="$(version_at "$BASE_SHA" "$marketplace")"
+          head_marketplace_version="$(version_at "$HEAD_SHA" "$marketplace")"
+
+          if [ -z "$head_marketplace_version" ]; then
+            echo "::error file=$marketplace::missing marketplace version"
+            fail=1
+          elif [ -n "$base_marketplace_version" ] \
+            && ! is_bumped \
+              "$head_marketplace_version" \
+              "$base_marketplace_version"
+          then
+            echo "::error file=$marketplace::version must increase" \
+              "(base '$base_marketplace_version'," \
+              "head '$head_marketplace_version')"
+            fail=1
+          else
+            echo "marketplace version:" \
+              "'${base_marketplace_version:-<new>}' ->" \
+              "'$head_marketplace_version'"
+          fi
+
+          changed_plugins="$(git diff --name-only \
+            "$BASE_SHA" "$HEAD_SHA" -- plugins/ \
+            | awk -F/ 'NF >= 3 { print $2 }' \
+            | sort -u)"
+
+          for plugin in $changed_plugins; do
+            manifest="plugins/$plugin/.claude-plugin/plugin.json"
+            base_plugin_version="$(version_at "$BASE_SHA" "$manifest")"
+            head_plugin_version="$(version_at "$HEAD_SHA" "$manifest")"
+
+            if [ -z "$head_plugin_version" ]; then
+              if git cat-file -e \
+                "$HEAD_SHA:plugins/$plugin" 2>/dev/null
+              then
+                echo "::error file=$manifest::changed plugin '$plugin'" \
+                  "has no versioned manifest"
+                fail=1
+              else
+                echo "plugin '$plugin' was removed or renamed"
+              fi
+            elif [ -n "$base_plugin_version" ] \
+              && ! is_bumped \
+                "$head_plugin_version" \
+                "$base_plugin_version"
+            then
+              echo "::error file=$manifest::plugin '$plugin'" \
+                "version must increase (base '$base_plugin_version'," \
+                "head '$head_plugin_version')"
+              fail=1
+            else
+              echo "plugin '$plugin' version:" \
+                "'${base_plugin_version:-<new>}' ->" \
+                "'$head_plugin_version'"
+            fi
+          done
+
+          if [ "$fail" -ne 0 ]; then
+            exit 1
+          fi
