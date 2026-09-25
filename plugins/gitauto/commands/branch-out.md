@@ -1,16 +1,17 @@
 ---
-description: Move off main/master onto a safely named feature branch (no-op on a feature branch)
+description: Move off main/master onto a feature branch (no-op on a feature branch)
 argument-hint: "[branch name]"
+model: haiku
+allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/scripts/branch-out.sh:*)
 ---
+!`${CLAUDE_PLUGIN_ROOT}/scripts/branch-out.sh '$ARGUMENTS'`
 
-Call the `Workflow` tool exactly once with `name` set to `gitauto:flow-run`
-and `args` set to this exact JSON object:
+If the output above starts with `DONE`, reply with that line verbatim. Call no tools.
 
-```json
-{"root": "${CLAUDE_PLUGIN_ROOT}/scripts", "until": "branch"}
-```
+Otherwise invent 3 distinct, concise, lowercase branch names (`feat/`, `fix/`,
+`docs/`, or `chore/` plus a kebab-case slug) from the `hint` and the listed
+changes; with neither, use `work/<adjective>-<noun>`. Run exactly once:
 
-If `$ARGUMENTS` names a branch, add `"branch"` set to it; otherwise the flow
-proposes candidate names and checks out the first free one. Never drop `root` or `until`.
+`${CLAUDE_PLUGIN_ROOT}/scripts/branch-out.sh --create '<n1>' '<n2>' '<n3>'`
 
-Wait for the workflow to finish, then report its result verbatim.
+Reply with its output line verbatim. Nothing else.

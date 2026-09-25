@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "gitauto",
-  "description": "Guarded Git delivery: `/gitauto:branch-out` leaves main, `/gitauto:open-pr` runs the flow up to an open pull request, and `/gitauto:ship` runs the whole flow through merge, cleanup, and optional tag. Every stage is backed by a deterministic bash helper that enforces branch safety.",
-  "version": "0.3.0",
+  "description": "Token-cheap Git delivery commands on haiku, backed by bundled scripts. `/gitauto:branch-out` leaves main; `/gitauto:open-pr` opens a PR and waits for green CI; `/gitauto:ship` runs the full flow through merge, sync, cleanup, and an opt-in tag prompt. An Opus PR writer is used only for complex changes.",
+  "version": "0.5.0",
   "author": {
     "name": "Andres Bott",
     "email": "contact@andresbott.com"

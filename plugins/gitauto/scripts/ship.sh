@@ -42,7 +42,7 @@ CI_MIN="${GITAUTO_CMD_CI_MIN:-30}"
 fail() { printf 'DONE state=failed report=%s\n' "$*"; exit 2; }
 
 git rev-parse --git-dir >/dev/null 2>&1 || fail "not a git repository"
-draft_dir="$(git rev-parse --absolute-git-dir)/gitauto-cmd"
+draft_dir="$(git rev-parse --absolute-git-dir)/gitauto"
 
 base_ref() {
   local base="$1"
@@ -190,7 +190,7 @@ run() {
   [[ -z "$body" || -z "$subject" ]] || body+=$'\n\n'"<!-- $SUBJECT_TAG: $subject -->"
 
   local log merged=no out st rc=0 branch number='' url='' worktree='' summary n=0 mark=1
-  log="$(mktemp "${TMPDIR:-/tmp}/gitauto-cmd-ship.XXXXXX")"
+  log="$(mktemp "${TMPDIR:-/tmp}/gitauto-ship.XXXXXX")"
   printf 'ship: started; live output: tail -f %s\n' "$log"
   begin() { n=$((n + 1)); mark=$(($(wc -l < "$log") + 1)); printf '\n== %s\n' "$1" >> "$log"; printf 'ship: [%s] %s ...\n' "$n" "$1"; }
   end() { printf 'ship: [%s] %s -> %s\n' "$n" "$1" "${st:-none}"; }
@@ -290,7 +290,7 @@ run() {
   if [[ "$st" == already-merged ]]; then
     merged=yes
     if [[ "$until" == pr ]]; then
-      printf 'READY pr=#%s url=%s state=already-merged report=already merged; run /gitauto-cmd:ship to sync and clean up log=%s\n' \
+      printf 'READY pr=#%s url=%s state=already-merged report=already merged; run /gitauto:ship to sync and clean up log=%s\n' \
         "$number" "$url" "$log"
       exit 0
     fi
@@ -374,7 +374,7 @@ tag_cmd() {
   local version="${1:-}" primary log out st
   [[ -n "$version" ]] || fail "usage: ship.sh tag <version>"
   primary="$(git worktree list --porcelain | awk '/^worktree / { print substr($0, 10); exit }')"
-  log="$(mktemp "${TMPDIR:-/tmp}/gitauto-cmd-tag.XXXXXX")"
+  log="$(mktemp "${TMPDIR:-/tmp}/gitauto-tag.XXXXXX")"
   out="$("$D/gitauto-tag.sh" "version=$version" remote=origin "worktree=${primary:-.}" 2>> "$log")"
   printf '%s\n' "$out" >> "$log"
   st="$(sed -n 's/^state=//p' <<< "$out" | tail -n 1)"
