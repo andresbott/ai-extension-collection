@@ -14,7 +14,7 @@
 # tried, so the model never needs a second round.
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/lib.sh"
+source "$SCRIPT_DIR/gitauto-lib.sh"
 
 fail() { printf 'DONE state=failed report=%s\n' "$*"; exit 2; }
 
