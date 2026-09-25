@@ -1,6 +1,6 @@
 # gitauto
 
-Token-cheap Git delivery commands: plain slash commands on `haiku` plus bash
+Token-cheap Git delivery commands for **Claude Code and pi**, backed by bash
 scripts. The scripts do the work; the model only writes the prose a script
 can't: branch names, commit messages, and pull request descriptions. An
 expensive model is used only when a PR description is genuinely hard to write.
@@ -17,6 +17,54 @@ expensive model is used only when a PR description is genuinely hard to write.
 a later `ship` finds it open with a clean tree (`need=none`). It skips verify,
 reuses the PR, and merges with the subject saved in the PR, so no text has to
 be written the second time.
+
+## One core, two adapters
+
+```text
+scripts/*.sh             core, shared: all Git and GitHub behaviour, the output
+                         lines, and the `--- write` rules for every text
+agents/pr-writer.md      shared prompt for complex PRs
+commands/*.md            Claude Code adapter (+ .claude-plugin/plugin.json)
+pi/index.ts              pi adapter (loaded through the repo's package.json)
+```
+
+- **Behaviour lives in the core.** A flow change goes into the scripts, so both
+  harnesses get it. An adapter only runs the scripts, has a model write the
+  texts the `--- write` block lists, asks the user about a tag, and re-runs on
+  `WAITING`. It never makes Git decisions.
+- **The output lines are the interface** (see [Output](#output)). Changing one
+  is a breaking change: update the script tests and both adapters.
+- **Writing rules are printed, not copied.** `prepare` and `branch-out.sh` print
+  a `--- write` block with one `<key>: <rule>` line per text they need
+  (`branch`, `title`, `subject`, `body`, `message`). Each adapter hands it to its
+  model unchanged, so the rules live only in `gitauto_write_rules`.
+
+## Use it in pi
+
+Install the repository as a pi package (its root `package.json` lists the pi
+adapters):
+
+```sh
+pi install git:github.com/andresbott/ai-extension-collection
+```
+
+The same `/gitauto:branch-out`, `/gitauto:open-pr`, and `/gitauto:ship`
+commands appear, with the same arguments. The pi adapter runs the flow in
+TypeScript, so no model decides how to run it:
+
+- **Texts** come from one nested model call without tools, given the script's
+  output (`GITAUTO_CHEAP_MODEL`). For complex changes, a one-shot
+  `pi --print` process runs the shared `pr-writer.md` prompt with read-only
+  tools and saves the draft (`GITAUTO_EXPERT_MODEL`). If it saves none, the
+  cheap writer takes over. Both variables take `provider/id` and default to
+  the session's model.
+- **Your chat stays clean.** Progress lines show in a widget while the command
+  runs; only the final report is added to the session, so you can ask the model
+  about a failure afterwards.
+- **The tag question** is a pi selector, with "No tag" first.
+- **No 10-minute cap.** `GITAUTO_CMD_RUN_BUDGET` defaults to 3600 seconds, so
+  `WAITING` rounds are rare; up to 5 are still resumed automatically.
+- `GITAUTO_PI_BIN` overrides the `pi` binary the expert writer runs.
 
 ## How branch-out stays cheap
 
@@ -43,7 +91,8 @@ be written the second time.
 1. **`prepare`** (preprocessing, no mutation) checks the guards and `gh` auth,
    sizes the change against the default branch, and prints a `SHIP` line:
    `need=pr|message|none` says what text is missing, and `writer=cheap|expert`
-   says who writes it. For the cheap writer it appends status, commits,
+   says who writes it. A `--- write` block lists each text to write, with its
+   rule. For the cheap writer it appends status, commits,
    diffstat, and a patch truncated to 200 lines. Nothing to ship prints `DONE`.
 2. **Writing the text:**
    - `writer=cheap`: haiku writes the prose title, the Conventional subject,
@@ -140,6 +189,8 @@ subject is a separate **Conventional Commit** line
 
 ```text
 DONE state=created|unchanged|nothing|failed ...        # nothing left for the model
+SHIP ... need=... writer=... / NEED_NAME ...            # prepare / branch-out: context follows
+--- write                                               # then `<key>: <rule>` per text to write
 ship: [n] <stage> ... / -> <state>                      # progress, one pair per stage
 --- failure: verify|wait-ci ...                         # only on those failures
 SHIPPED pr=#N url=... sync=synced cleanup=clean ... tag=ask|declined|none|tagged ... log=<file>
@@ -180,7 +231,11 @@ working tree. Check `git status` first.
 
 ```sh
 bash plugins/gitauto/scripts/run-tests.sh
+node --test plugins/gitauto/pi/*.test.ts
 ```
 
-This runs `branch-out.test.sh`, `ship.test.sh` (a local bare remote plus a fake
-`gh`, end to end), and the helper tests.
+The first runs `branch-out.test.sh`, `ship.test.sh` (a local bare remote plus a
+fake `gh`, end to end), and the helper tests. The second runs the pi adapter's
+parser and flow tests, plus end-to-end runs of the pi commands against the real
+scripts with a fake model and the same fake `gh` (`scripts/testdata/fake-gh`).
+`npm test` from the repository root runs both.

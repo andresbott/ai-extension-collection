@@ -96,6 +96,28 @@ jobs:
             fi
           done
 
+          # The pi package: a changed pi adapter or package.json needs a bump.
+          if git diff --name-only "$BASE_SHA" "$HEAD_SHA" \
+            | grep -qE '^(package\.json$|plugins/[^/]+/pi/)'
+          then
+            base_pi_version="$(version_at "$BASE_SHA" package.json)"
+            head_pi_version="$(version_at "$HEAD_SHA" package.json)"
+            if [ -z "$head_pi_version" ]; then
+              echo "::error file=package.json::missing pi package version"
+              fail=1
+            elif [ -n "$base_pi_version" ] \
+              && ! is_bumped "$head_pi_version" "$base_pi_version"
+            then
+              echo "::error file=package.json::pi package version must" \
+                "increase (base '$base_pi_version'," \
+                "head '$head_pi_version')"
+              fail=1
+            else
+              echo "pi package version:" \
+                "'${base_pi_version:-<new>}' -> '$head_pi_version'"
+            fi
+          fi
+
           if [ "$fail" -ne 0 ]; then
             exit 1
           fi
