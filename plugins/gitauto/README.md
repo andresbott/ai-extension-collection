@@ -1,26 +1,37 @@
 # gitauto
 
-A guarded Git delivery suite. Every step of the flow — branch, verify, commit,
-push, open a pull request, wait for CI, merge, synchronize the default branch,
-clean up, tag — is a slash command backed by a deterministic bash helper that
-owns the mutation and enforces its own safety checks. `/gitauto:ship` runs the
-whole flow in order and reports a stage ledger.
+A guarded Git delivery suite with three commands. Every step of the flow —
+branch, verify, commit, push, open a pull request, wait for CI, merge,
+synchronize the default branch, clean up, tag — is backed by a deterministic
+bash helper that owns the mutation and enforces its own safety checks. The
+individual steps are internal stages, not commands.
 
 ## Commands
 
 | Command | Arguments | Behaviour |
 |---|---|---|
-| `/gitauto:branch` | `[name]` | On `main`/`master`, creates and checks out a feature branch; an explicit name wins, otherwise a name is inferred from the uncommitted changes, with deterministic file-based and invented fallbacks. Existing feature branches are left unchanged. |
-| `/gitauto:verify` | `[check \| target=<make-target>]` | Runs one explicit check or Make target when supplied; otherwise prefers a `verify` Make target, then declared `test`, `lint`, `vet`, and `check` targets, then package scripts or standard Go module checks. Stops on the first failure and returns `pass`, `fail`, or `skip`. |
-| `/gitauto:commit` | `[message]` | On a feature branch, stages everything and creates exactly one commit with a one-line message (supplied verbatim, or composed from the diff). No body, no `Co-Authored-By`. Clean trees are unchanged; `main`, `master`, and detached HEAD are blocked before staging. |
-| `/gitauto:push` | `[remote=<name>]` | Pushes the current feature branch and configures its upstream, re-checking the protected-branch guard immediately before pushing. Defaults to `origin`. |
-| `/gitauto:open-pr` | `[title=<text>] [body=<markdown>] [base=<branch>]` | Reuses an existing open pull request or creates one for the current branch. Merged and closed pull requests stay distinct, and lookup failures never fall through to creation. A missing title or body is composed as a compact `## Summary` / `## What` / optional `## Notes` description. |
-| `/gitauto:wait-ci` | `[pr=<number>]` | Watches the pull request checks and returns `green`, `failed`, `none`, `pending`, or `blocked`. Never merges; "no checks configured" stays distinct from a failure. |
-| `/gitauto:merge` | `[pr=<number>] [subject=<conventional-subject>]` | Squash-merges one open pull request with a validated Conventional Commit subject, after confirming the head matches the current branch and checks are green or explicitly absent. Already-merged pull requests are idempotent. |
-| `/gitauto:sync-main` | `[remote=<name>] [main=<branch>]` | Locates the primary worktree, refuses to overwrite a dirty one, switches it to the default branch, fetches, and fast-forwards only. |
-| `/gitauto:cleanup` | `[branch=<feature>] [remote=<name>] [deleteRemote=true\|false]` | Prunes remote state and removes clean, inactive worktrees for a merged branch. The local branch is always kept, remote deletion requires an explicit `deleteRemote=true`, and active or dirty worktrees are deferred and reported as partial. |
-| `/gitauto:tag` | `[version=<semver>] [subject=<conventional-subject>] [remote=<name>] [worktree=<path>]` | Without a version, recommends the next SemVer and publishes nothing. An explicit, strictly increasing version runs from the synchronized primary default-branch worktree and authorizes the repository's `make tag` target. |
-| `/gitauto:ship` | `[branch=] [message=] [title=] [body=] [subject=] [base=] [remote=] [deleteRemote=] [tag=]` | Runs the full flow in order and keeps a stage ledger (see below). |
+| `/gitauto:branch-out` | `[branch name]` | On `main`/`master`, creates and checks out a feature branch; otherwise leaves the current branch unchanged. |
+| `/gitauto:open-pr` | `[branch=] [message=] [title=] [body=] [base=] [remote=]` | Runs the ship flow up to and including `open-pr`, then stops: no CI wait, merge, or tag. |
+| `/gitauto:ship` | `[branch=] [message=] [title=] [body=] [subject=] [base=] [remote=] [deleteRemote=] [tag=<semver>\|no tag]` | Runs the full flow in order and keeps a stage ledger (see below). |
+
+Arguments may be `key=value` pairs or plain language. For `ship`, an explicit
+version tags the release; declining a tag in any wording (`/gitauto:ship dont
+create tag`) skips tagging and the command never asks about a tag.
+
+## Stages
+
+| Stage | Behaviour |
+|---|---|
+| `branch` | On `main`/`master`, creates and checks out a feature branch; an explicit name wins, otherwise a name is inferred from the uncommitted changes, with deterministic file-based and invented fallbacks. Existing feature branches are left unchanged. |
+| `verify` | Prefers a `verify` Make target, then declared `test`, `lint`, `vet`, and `check` targets, then package scripts or standard Go module checks. Stops on the first failure and returns `pass`, `fail`, or `skip`. |
+| `commit` | On a feature branch, stages everything and creates exactly one commit with a one-line message (supplied verbatim, or composed from the diff). No body, no `Co-Authored-By`. Clean trees are unchanged; `main`, `master`, and detached HEAD are blocked before staging. |
+| `push` | Pushes the current feature branch and configures its upstream, re-checking the protected-branch guard immediately before pushing. Defaults to `origin`. |
+| `open-pr` | Reuses an existing open pull request or creates one for the current branch. Merged and closed pull requests stay distinct, and lookup failures never fall through to creation. A missing title or body is composed as a compact `## Summary` / `## What` / optional `## Notes` description. |
+| `wait-ci` | Watches the pull request checks and returns `green`, `failed`, `none`, `pending`, or `blocked`. "No checks configured" stays distinct from a failure. |
+| `merge` | Squash-merges the pull request with a validated Conventional Commit subject, after confirming the head matches the current branch and checks are green or explicitly absent. Already-merged pull requests are idempotent. |
+| `sync-main` | Locates the primary worktree, refuses to overwrite a dirty one, switches it to the default branch, fetches, and fast-forwards only. |
+| `cleanup` | Prunes remote state and removes clean, inactive worktrees for the merged branch. The local branch is always kept, remote deletion requires an explicit `deleteRemote=true`, and active or dirty worktrees are deferred and reported as partial. |
+| `tag` | Only with an explicit, strictly increasing version: runs from the synchronized primary default-branch worktree and authorizes the repository's `make tag` target. |
 
 `/gitauto:ship` runs the stages in exactly this order:
 
@@ -44,16 +55,18 @@ softened in prose.
 Each command is a thin launcher. The real work runs in three layers:
 
 ```text
-/gitauto:<leaf>  →  workflows/<leaf>.js  →  scripts/gitauto-<leaf>.sh
-   command            dynamic workflow        deterministic helper
+/gitauto:<command>  →  workflows/flow.js  →  scripts/gitauto-<stage>.sh
+      command            dynamic workflow      deterministic helper
 ```
 
 The command exists only to resolve `${CLAUDE_PLUGIN_ROOT}` and hand the workflow
 a `root` pointing at `scripts/`; a workflow cannot resolve that variable itself.
-The workflow owns the prompt and a JSON output schema the runtime validates and
-retries against. The helper owns every mutation.
+Every command launches the same workflow and passes `until` (`branch`,
+`open-pr`, or `ship`) to choose how far it runs. The workflow owns each stage's
+prompt and a JSON output schema the runtime validates and retries against. The
+helper owns every mutation.
 
-The split below is deliberate and identical across all leaves:
+The split below is deliberate and identical across all stages:
 
 - **The bash helpers in `scripts/` own every mutation.** Staging, committing,
   branching, pushing, pull request creation, merging, fetching, fast-forwarding,
@@ -73,14 +86,16 @@ The split below is deliberate and identical across all leaves:
   forbidden from re-running a helper to work around a `blocked` or `failed`
   result.
 
-Workflow names are suffixed `-run` (`gitauto:verify-run`) so they do not collide
-with the command names (`/gitauto:verify`). Without that suffix the slash command
-resolves to the workflow instead of the command, which launches it with no `root`.
+The workflow is named `flow-run` so it does not collide with any command name.
+Without a distinct name the slash command resolves to the workflow instead of
+the command, which launches it with no `root`. Claude Code exposes every plugin
+workflow by name, so `/gitauto:flow-run` is also listed; it is internal — use
+the three commands.
 
 ## Claude Code
 
 Install the plugin from the marketplace and the commands appear as
-`/gitauto:<leaf>`:
+`/gitauto:branch-out`, `/gitauto:open-pr`, and `/gitauto:ship`:
 
 ```text
 /plugin install gitauto@ai-extension-collection
@@ -96,7 +111,7 @@ Pi is not wired up yet. Its `pi-claude-marketplace` bridge handles `agents/`,
 `commands/`, `hooks/`, `mcp`, and `skills/` — there is no `workflows/` bridge, so
 a plugin-shipped workflow is currently Claude Code only.
 
-The workflow scripts themselves remain Pi-compatible: each falls back to
+The workflow script itself remains Pi-compatible: it falls back to
 `$HOME/.pi/workflows/saved` when no `root` argument is supplied, which is where
 the upstream `pi-code-config` Makefile installs the helpers. Wiring Pi to load
 them from the plugin is still an open task.
@@ -107,7 +122,7 @@ them from the plugin is still an open task.
 - The GitHub CLI `gh`, authenticated, for `open-pr`, `wait-ci`, and `merge`
   (and, as a fallback, for default-branch resolution).
 - A `tag` target in the repository's `Makefile`, `makefile`, or `GNUmakefile`
-  for `tag`. Without it, tagging is blocked.
+  for the `tag` stage. Without it, tagging is blocked.
 - `verify` uses whatever the repository declares: Make targets, package scripts,
   or Go module checks. It skips cleanly when it finds none.
 

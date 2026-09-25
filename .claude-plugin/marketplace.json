@@ -6,7 +6,7 @@
     "email": "contact@andresbott.com"
   },
   "description": "Claude Code extensions marketplace",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "plugins": [
     {
       "name": "architects",
@@ -26,7 +26,7 @@
     {
       "name": "gitauto",
       "source": "./plugins/gitauto",
-      "description": "Guarded Git delivery commands from branch creation through merge, cleanup, and optional release tagging."
+      "description": "Guarded Git delivery commands: branch-out, open-pr, and ship (through merge, cleanup, and optional release tagging)."
     },
     {
       "name": "go-idioms",

@@ -1,17 +1,21 @@
 ---
-description: Create or reuse a pull request for the current feature branch
-argument-hint: "[title=<text>] [body=<markdown>] [base=<branch>]"
+description: Run the ship flow up to an open pull request (branch, verify, commit, push, open-pr)
+argument-hint: "[branch=<name>] [message=<text>] [title=<text>] [body=<markdown>] [base=<branch>] [remote=<name>]"
 ---
 
-Call the `Workflow` tool exactly once with `name` set to `gitauto:open-pr-run`
+Call the `Workflow` tool exactly once with `name` set to `gitauto:flow-run`
 and `args` set to this exact JSON object:
 
 ```json
-{"root": "${CLAUDE_PLUGIN_ROOT}/scripts"}
+{"root": "${CLAUDE_PLUGIN_ROOT}/scripts", "until": "open-pr"}
 ```
 
-Add `"title"`, `"body"`, and `"base"` only for values present in `$ARGUMENTS`;
-the workflow composes a missing title or body itself. Never drop `root` — the
-workflow cannot find its helper without it.
+`$ARGUMENTS` may be `key=value` pairs or plain language. Add any of `"branch"`,
+`"message"`, `"title"`, `"body"`, `"base"`, and `"remote"` that it specifies;
+the flow composes anything missing itself. Never drop `root` or `until`.
 
-Wait for the workflow to finish, then report its result verbatim.
+This runs branch → verify → commit → push → open-pr and stops there: it never
+waits for CI, merges, or tags.
+
+Wait for the workflow to finish, then report its stage ledger and the pull
+request URL verbatim.
