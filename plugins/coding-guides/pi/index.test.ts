@@ -7,9 +7,9 @@ import { test } from "node:test";
 
 import codingGuides, { GUIDES, SECTION } from "./index.ts";
 
-// The shared script fails open without jq, and its newline checks need GNU grep -P.
+// Without jq the shared script can't parse the payload and blocks every commit
+// with an install hint, so the rule-specific reasons below need jq.
 const HAS_JQ = spawnSync("jq", ["--version"]).status === 0;
-const HAS_GREP_P = spawnSync("grep", ["-Pq", ""], { input: "\n" }).status === 0;
 
 type Handler = (event: any) => any;
 
@@ -43,14 +43,17 @@ test("blocks a multi-paragraph commit with the script's reason", { skip: !HAS_JQ
   assert.match(result.reason, /git commit -m "<type>: one-line summary"/);
 });
 
-test("blocks a newline inside -m", { skip: !(HAS_JQ && HAS_GREP_P) && "jq or grep -P unavailable" }, () => {
+test("blocks a newline inside -m", { skip: !HAS_JQ && "jq not installed" }, () => {
   const result = toolCall("bash", { command: 'git commit -m "feat: x\n\n- bullet"' });
   assert.equal(result?.block, true);
   assert.match(result.reason, /spans multiple lines/);
 });
 
-test("allows a single-line commit and other commands", () => {
+test("allows a single-line commit", { skip: !HAS_JQ && "jq not installed" }, () => {
   assert.equal(toolCall("bash", { command: 'git add -A && git commit -m "fix: bug"' }), undefined);
+});
+
+test("allows commands other than git commit", () => {
   assert.equal(toolCall("bash", { command: "ls -la" }), undefined);
 });
 

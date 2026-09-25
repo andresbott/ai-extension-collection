@@ -20,8 +20,9 @@ export type Block = { block: true; reason: string };
 
 /**
  * Run the shared PreToolUse script on a shell command, fed the payload Claude
- * Code sends. Exit 2 blocks with the script's stderr as the reason; anything
- * else (including a missing bash or jq) allows, matching the script's fail-open.
+ * Code sends. Exit 2 blocks with the script's stderr as the reason (without jq
+ * the script blocks git commit calls with an install hint); anything else,
+ * including a missing bash, allows.
  */
 export function checkCommand(command: string): Block | undefined {
   const input = JSON.stringify({ tool_name: "Bash", tool_input: { command } });
