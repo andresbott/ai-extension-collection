@@ -35,6 +35,18 @@ A plugin can also work in pi. Keep both harnesses on one core:
 - Put its tests next to it as `pi/*.test.ts`. Node runs them directly
   (`npm run test:pi`).
 
+## Add a pi-only plugin
+
+An extension that exists only for pi (no Claude Code equivalent) still lives in
+`plugins/<plugin-name>/`, named `pi-<name>`:
+
+- Put the code and its `*.test.ts` files in `plugins/<plugin-name>/pi/`, with
+  `pi/index.ts` as the entry point, and list it in the root `package.json` under
+  `pi.extensions`.
+- Add no `.claude-plugin/` directory. The root `package.json` version covers it,
+  and the version policy treats a plugin with `pi/` but no manifest as pi-only.
+- Do not register it in `.claude-plugin/marketplace.json`.
+
 Load an adapter directly while iterating:
 
 ```sh
@@ -70,7 +82,7 @@ and reload plugins after changing an installed plugin:
 ## Version policy
 
 Every commit must increase the version in `.claude-plugin/marketplace.json`.
-Commits that change a plugin must also increase that plugin's own manifest
-version. Commits that change a pi adapter (`plugins/*/pi/`) or the root
-`package.json` must also increase the root `package.json` version. Pull requests
+Commits that change a Claude plugin must also increase that plugin's own manifest
+version. Commits that change a pi adapter (`plugins/*/pi/`), a pi-only plugin, or
+the root `package.json` must also increase the root `package.json` version. Pull requests
 enforce this policy through `.github/workflows/version-bump.yml`.

@@ -65,10 +65,24 @@ jobs:
             | awk -F/ 'NF >= 3 { print $2 }' \
             | sort -u)"
 
+          pi_only_changed=0
           for plugin in $changed_plugins; do
             manifest="plugins/$plugin/.claude-plugin/plugin.json"
             base_plugin_version="$(version_at "$BASE_SHA" "$manifest")"
             head_plugin_version="$(version_at "$HEAD_SHA" "$manifest")"
+
+            # A pi-only plugin has pi/ but no Claude manifest; the pi
+            # package version below covers it.
+            if [ -z "$head_plugin_version" ] \
+              && ! git cat-file -e \
+                "$HEAD_SHA:plugins/$plugin/.claude-plugin" 2>/dev/null \
+              && git cat-file -e \
+                "$HEAD_SHA:plugins/$plugin/pi" 2>/dev/null
+            then
+              echo "plugin '$plugin' is pi-only"
+              pi_only_changed=1
+              continue
+            fi
 
             if [ -z "$head_plugin_version" ]; then
               if git cat-file -e \
@@ -96,9 +110,11 @@ jobs:
             fi
           done
 
-          # The pi package: a changed pi adapter or package.json needs a bump.
-          if git diff --name-only "$BASE_SHA" "$HEAD_SHA" \
-            | grep -qE '^(package\.json$|plugins/[^/]+/pi/)'
+          # The pi package: a changed pi adapter, pi-only plugin, or
+          # package.json needs a bump.
+          if [ "$pi_only_changed" -eq 1 ] \
+            || git diff --name-only "$BASE_SHA" "$HEAD_SHA" \
+              | grep -qE '^(package\.json$|plugins/[^/]+/pi/)'
           then
             base_pi_version="$(version_at "$BASE_SHA" package.json)"
             head_pi_version="$(version_at "$HEAD_SHA" package.json)"
