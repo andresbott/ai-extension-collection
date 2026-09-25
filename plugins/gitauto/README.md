@@ -53,11 +53,23 @@ commands appear, with the same arguments. The pi adapter runs the flow in
 TypeScript, so no model decides how to run it:
 
 - **Texts** come from one nested model call without tools, given the script's
-  output (`GITAUTO_CHEAP_MODEL`). For complex changes, a one-shot
-  `pi --print` process runs the shared `pr-writer.md` prompt with read-only
-  tools and saves the draft (`GITAUTO_EXPERT_MODEL`). If it saves none, the
-  cheap writer takes over. Both variables take `provider/id` and default to
-  the session's model.
+  output. For complex changes, a one-shot `pi --print` process runs the shared
+  `pr-writer.md` prompt with read-only tools and saves the draft. If it saves
+  none, the cheap writer takes over.
+- **Two models, as in Claude Code** (haiku for the command, opus for
+  `pr-writer`), with no setup:
+  - **Simple texts** (branch names, commit messages, small PR texts, the failure
+    diagnosis) use a cheap model: Haiku, or else a GPT mini or a Flash model.
+    gitauto picks the newest one you can reach, preferring your session's
+    provider (for example `github-copilot/claude-haiku-4.5`). It falls back to
+    the session's model only when none is available. The widget shows which
+    model wrote the texts.
+  - **Complex PR titles and bodies** (the `pr-writer` expert) use your session's
+    model, the stronger one you chose. If it saves no draft, for example after a
+    failure or a refusal, the cheap writer takes over.
+
+  `GITAUTO_CHEAP_MODEL` and `GITAUTO_EXPERT_MODEL` (`provider/id` or a bare id)
+  are optional overrides for either role.
 - **Your chat stays clean.** Progress lines show in a widget while the command
   runs; only the final report is added to the session, so you can ask the model
   about a failure afterwards.
