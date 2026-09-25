@@ -63,6 +63,26 @@ output="$( (cd "$repo" && "$TAG_SCRIPT" 'version=v1.3.0') 2>&1)" || fail "explic
 [[ "$output" == *'state=tagged'* && "$(cat "$repo/tag.out")" == v1.3.0 ]] || fail "explicit version was not passed to make tag: $output"
 printf 'PASS: explicit increasing SemVer invokes make tag exactly\n'
 
+# Many repos read the lowercase `version` variable (make tag version="v1.2.3").
+new_fixture
+cat > "$repo/Makefile" <<'MAKE'
+tag:
+	@[ "${version}" ] || ( echo ">> version is not set"; exit 1 )
+	@printf '%s\n' "$(version)" > tag.out
+MAKE
+output="$( (cd "$repo" && "$TAG_SCRIPT" 'version=v1.3.0') 2>&1)" || fail "lowercase version tag failed: $output"
+[[ "$output" == *'state=tagged'* && "$(cat "$repo/tag.out")" == v1.3.0 ]] || fail "lowercase version was not passed to make tag: $output"
+printf 'PASS: make tag receives the version as lowercase version too\n'
+
+new_fixture
+printf 'tag:\n\t@exit 3\n' > "$repo/Makefile"
+set +e
+output="$( (cd "$repo" && "$TAG_SCRIPT" 'version=v1.3.0') 2>/dev/null)"
+status=$?
+set -e
+[[ $status -ne 0 && "$output" == *'state=failed'* && "$output" == *'report=make tag failed'* ]] || fail "failing make tag was not reported: status=$status output=$output"
+printf 'PASS: a failing make tag is reported as failed\n'
+
 new_fixture; add_tag_target
 git -C "$repo" branch feat/release
 git -C "$repo" worktree add -q "$root/feature" feat/release
