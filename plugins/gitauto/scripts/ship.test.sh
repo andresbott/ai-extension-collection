@@ -3,6 +3,7 @@
 set -euo pipefail
 
 SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/ship.sh"
+TESTDATA="$(dirname "$SCRIPT")/testdata"
 roots=()
 trap 'rm -rf "${roots[@]}"' EXIT
 fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
@@ -18,41 +19,7 @@ fixture() {
   printf 'base\n' > "$repo/README.md"; git -C "$repo" add README.md; git -C "$repo" commit -qm init
   git -C "$repo" remote add origin "$remote"; git -C "$repo" push -qu origin main 2>/dev/null
   git -C "$repo" remote set-head origin main
-  cat > "$bin/gh" <<'GH'
-#!/usr/bin/env bash
-s="$FAKE_GH"; printf '%s\n' "$*" >> "$s/log"
-json=''; prev=''; for a in "$@"; do [[ "$prev" == --json ]] && json="$a"; prev="$a"; done
-case "${1:-} ${2:-}" in
-  'auth status') exit 0 ;;
-  'repo view') exit 1 ;;
-  'pr create')
-    while [[ $# -gt 0 ]]; do case "$1" in --head) printf '%s' "$2" > "$s/head" ;; --title) printf '%s' "$2" > "$s/title" ;; --body) printf '%s' "$2" > "$s/body" ;; esac; shift; done
-    git rev-parse HEAD > "$s/oid"
-    printf 'https://github.com/o/r/pull/7\n' ;;
-  'pr view')
-    [[ -f "$s/head" ]] || { printf 'no pull requests found for branch\n' >&2; exit 1; }
-    state="$(cat "$s/state" 2>/dev/null || echo OPEN)"
-    case "$json" in
-      number,state,url) printf '7\t%s\thttps://github.com/o/r/pull/7\n' "$state" ;;
-      number,state,headRefName) printf '7\t%s\t%s\n' "$state" "$(cat "$s/head")" ;;
-      number,state,title) printf '%s#7 %s\n' "${state,,}" "$(cat "$s/title")" ;;
-      number) printf '7\n' ;;
-      title) cat "$s/title"; printf '\n' ;;
-      headRefOid) cat "$s/oid" ;;
-      body) cat "$s/body"; printf '\n' ;;
-    esac ;;
-  'pr checks')
-    if [[ -f "$s/cislow" && -z "$json" ]]; then sleep 20; fi
-    if [[ -f "$s/cifail" ]]; then
-      if [[ -n "$json" ]]; then printf 'build\thttps://github.com/o/r/actions/runs/99/job/1\n'; exit 0; fi
-      printf 'build\tfail\n'; exit 1
-    fi
-    printf 'all checks passed\n' ;;
-  'run view') printf 'build\tTest\t2026-01-02T03:04:05.1234567Z --- FAIL: TestThing\nbuild\tTest\t2026-01-02T03:04:05.2Z expected 1, got 2\n' ;;
-  'pr merge') printf '%s\n' "$*" > "$s/merge"; printf 'MERGED' > "$s/state" ;;
-  *) printf 'fake gh: unsupported %s\n' "$*" >&2; exit 9 ;;
-esac
-GH
+  cp "$TESTDATA/fake-gh" "$bin/gh"
   chmod +x "$bin/gh"
   export PATH="$bin:$PATH"
 }
@@ -69,12 +36,16 @@ out="$(ship prepare 'tag=v1.0.0')"
 grep -q '^SHIP branch=main protected=yes base=main pr=none dirty=1 .* need=pr writer=cheap$' <<<"$out" || fail "cheap: $out"
 grep -q '^args: tag=v1.0.0$' <<<"$out" || fail "args: $out"
 grep -q '^+change$' <<<"$out" || fail "patch missing: $out"
+[[ "$(sed -n '/^--- write$/,/^--- status$/p' <<<"$out" | cut -d: -f1 | tr '\n' ' ')" == '--- write branch title subject body --- status ' ]] ||
+  fail "cheap write block: $out"
 [[ "$(on)" == main ]] || fail "prepare must not mutate"
 pass "small change is rated cheap and shows a truncated patch"
 
 out="$(cd "$repo" && GITAUTO_CMD_COMPLEX_LINES=0 "$SCRIPT" prepare '')"
 grep -q 'need=pr writer=expert$' <<<"$out" || fail "expert: $out"
 ! grep -q -- '--- patch' <<<"$out" || fail "expert context should be minimal: $out"
+[[ "$(sed -n '/^--- write$/,$p' <<<"$out" | cut -d: -f1 | tr '\n' ' ')" == '--- write branch ' ]] ||
+  fail "expert on main only needs branch names: $out"
 pass "large change is handed to the expert writer with no patch"
 
 out="$(ship run --title 'feat: x')"
@@ -105,6 +76,8 @@ rm "$FAKE_GH/state"
 printf 'two\n' >> "$repo/README.md"
 out="$(ship prepare '')"
 grep -q 'pr=open#7_fix:_first .* need=message writer=cheap$' <<<"$out" || fail "open pr: $out"
+[[ "$(sed -n '/^--- write$/,/^--- status$/p' <<<"$out" | cut -d: -f1 | tr '\n' ' ')" == '--- write message --- status ' ]] ||
+  fail "open pr write block: $out"
 pass "an open PR only needs a commit message"
 
 printf 'MERGED' > "$FAKE_GH/state"
@@ -199,6 +172,7 @@ grep -q '^READY pr=#7 url=https://github.com/o/r/pull/7 ci=green ' <<<"$out" || 
 [[ "$(on)" == feat/review ]] || fail "open-pr must stay on the branch"
 out="$(ship prepare '')"
 grep -q 'pr=open#7_feat:_review_me .* need=none ' <<<"$out" || fail "after open-pr: $out"
+! grep -q -- '^--- write$' <<<"$out" || fail "nothing to write should print no write block: $out"
 out="$(ship run)"
 grep -q '^SHIPPED pr=#7 ' <<<"$out" || fail "ship after open-pr: $out"
 grep -q -- '--subject feat: review me (#7)' "$FAKE_GH/merge" || fail "subject from PR title: $(cat "$FAKE_GH/merge")"
@@ -237,6 +211,7 @@ git -C "$repo" rev-parse HEAD > "$FAKE_GH/oid"
 out="$(ship prepare '')"
 grep -q 'need=subject ' <<<"$out" || fail "hand PR should need a subject: $out"
 grep -q '^pr_title: Opened by hand$' <<<"$out" || fail "pr_title missing: $out"
+grep -q '^subject: .*Reshape the pr_title line into it\.$' <<<"$out" || fail "subject rule missing: $out"
 out="$(ship run)"
 grep -q '^STOPPED stage=merge state=needs-subject ' <<<"$out" || fail "missing subject: $out"
 ! grep -q 'wait-ci' <<<"$out" || fail "should stop before waiting on CI: $out"

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Token-cheap branch-out. Every outcome is a single stdout line.
+# Token-cheap branch-out. Every outcome except NEED_NAME is a single stdout line.
 #
 #   branch-out.sh [name]            preflight (run by the command's ! line)
 #   branch-out.sh --create n1 [n2]  create the first free candidate
@@ -8,7 +8,9 @@
 #   DONE state=unchanged branch=<b>              already on a feature branch
 #   DONE state=created branch=<b> from=<base>    branch created and checked out
 #   DONE state=failed report=<why>               nothing changed
-#   NEED_NAME ...                                model must supply candidates
+#   NEED_NAME ...                                model must supply candidates;
+#                                                status lines and a `--- write`
+#                                                block with the naming rule follow
 #
 # When every candidate is taken, -2..-9 suffixes on the first valid one are
 # tried, so the model never needs a second round.
@@ -74,3 +76,4 @@ printf 'NEED_NAME on=%s' "$current"
 [[ -n "$arg" ]] && printf ' hint=%q' "$arg"
 printf '\n'
 git status --short --untracked-files=all | head -n 25
+gitauto_write_rules branch

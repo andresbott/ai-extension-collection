@@ -15,8 +15,10 @@
 # tag=ask tag_recommended=... tag_options=... so the command can ask the user.
 #
 # prepare prints `DONE ...` (nothing for the model to do) or a `SHIP ...` context
-# block. run prints one final line: SHIPPED, PARTIAL, STOPPED, or WAITING; the full
-# helper output goes to a log file whose path is on that line.
+# block. Its `--- write` block lists each text the model must write, with its
+# rule (see gitauto_write_rules). run prints one final line: SHIPPED, PARTIAL,
+# STOPPED, or WAITING; the full helper output goes to a log file whose path is on
+# that line.
 #
 # run is built to fit one foreground tool call (Claude Code caps those at 10 min):
 # the CI wait gets whatever remains of GITAUTO_CMD_RUN_BUDGET seconds, and if CI
@@ -116,6 +118,13 @@ prepare() {
     "$current" "$protected" "$base" "${pr// /_}" "$dirty" "$ahead" "$files" "$lines" "$dirs" "$need" "$writer"
   [[ -n "$hint" ]] && printf 'args: %s\n' "$hint"
   [[ "$need" == *subject ]] && printf 'pr_title: %s\n' "$pr_title"
+  # Only the texts the next step needs, in the order `run` takes them.
+  local write=()
+  [[ "$protected" == yes ]] && write+=(branch)
+  [[ "$need" == pr && "$writer" == cheap ]] && write+=(title subject body)
+  [[ "$need" == message* ]] && write+=(message)
+  [[ "$need" == *subject ]] && write+=(subject-from-title)
+  gitauto_write_rules "${write[@]+"${write[@]}"}"
   # The expert writer reads the repo itself; nothing else to show.
   [[ "$need" == none || "$need" == subject || "$writer" == expert ]] && return 0
 

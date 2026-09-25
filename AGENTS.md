@@ -10,6 +10,10 @@ Every commit must increase the marketplace `version` in
 When a commit changes a plugin, it must also increase that plugin's `version` in
 `plugins/<name>/.claude-plugin/plugin.json`.
 
+When a commit changes a pi adapter (`plugins/<name>/pi/`) or the root
+`package.json` (the pi package), it must also increase the root `package.json`
+`version`.
+
 - Use semantic versioning (`MAJOR.MINOR.PATCH`).
 - A patch bump is appropriate for small, backward-compatible changes.
 - Bump every changed plugin when one commit touches multiple plugins.

@@ -1,0 +1,21 @@
+{
+  "name": "ai-extension-collection",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pi package for the ai-extension-collection plugins that ship a pi adapter (plugins/<name>/pi/).",
+  "type": "module",
+  "keywords": ["pi-package"],
+  "scripts": {
+    "test": "bash plugins/gitauto/scripts/run-tests.sh && npm run test:pi",
+    "test:pi": "node --test plugins/*/pi/*.test.ts"
+  },
+  "pi": {
+    "extensions": ["./plugins/gitauto/pi/index.ts"]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "peerDependenciesMeta": {
+    "@earendil-works/pi-coding-agent": { "optional": true }
+  }
+}

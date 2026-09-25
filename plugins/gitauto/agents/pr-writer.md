@@ -13,8 +13,9 @@ The change is the working tree plus all commits since
 `git diff --stat <merge-base>`, then read only what you need to understand
 *why* the change exists and what actually matters.
 
-**Read-only.** Use only `git status`, `git diff`, `git log`, `git show`, Read,
-Grep, and Glob. Never stage, commit, branch, push, or edit files.
+**Read-only.** Use only `git status`, `git diff`, `git log`, `git show`, and
+your file read and search tools (Read, Grep, Glob, or read, grep, find, ls).
+Never stage, commit, branch, push, or edit files.
 
 **Title:** one plain, imperative prose line naming the headline change (e.g.
 `Add a discovery view that recommends albums`). No single quotes.

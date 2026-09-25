@@ -36,7 +36,9 @@ pass "feature branch is left unchanged"
 
 new_repo
 out="$(run '')"
-[[ "$out" == "NEED_NAME on=main" ]] || fail "need name: $out"
+[[ "$(head -n 1 <<<"$out")" == "NEED_NAME on=main" ]] || fail "need name: $out"
+grep -q -- '^--- write$' <<<"$out" || fail "write block missing: $out"
+grep -q '^branch: 3 distinct' <<<"$out" || fail "branch rule missing: $out"
 printf 'x\n' > "$repo/new.txt"
 out="$(run 'add a login page')"
 grep -q '^NEED_NAME on=main hint=' <<<"$out" || fail "hint: $out"
