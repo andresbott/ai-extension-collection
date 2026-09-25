@@ -7,7 +7,7 @@ for reusable extensions.
 
 | Plugin | Type | Claude Code | pi | Description |
 | --- | --- | :---: | :---: | --- |
-| `architects` | Agents | ✅ | ❌ | Specialist agents for Go, Vue and TypeScript, OpenAPI, dependency layering, and project setup validation. |
+| `architects` | Agents | ✅ | ✅ | Specialist agents for Go, Vue and TypeScript, OpenAPI, dependency layering, and project setup validation. In pi they need [`pi-subagents`](https://github.com/nicobailon/pi-subagents). |
 | `coding-guides` | Hooks | ✅ | ❌ | Injects standing coding conventions and enforces selected tool-use rules. |
 | `doc-authoring` | Skill | ✅ | ❌ | Helps create and maintain internal, agent-facing project documentation. |
 | `gitauto` | Slash commands, Agent, pi extension | ✅ | ✅ | Token-cheap, script-backed Git commands for Claude Code (on haiku) and pi: `open-pr` stops at green CI, `ship` has an opt-in tag prompt; an expensive PR writer is used only for complex changes. |
@@ -39,12 +39,19 @@ After a plugin is published, install it with:
 
 ## Use it in pi
 
-Plugins with a pi adapter (`gitauto`) and the pi-only `pi-*` plugins are also a
-[pi package](https://pi.dev/packages), listed in the root `package.json`:
+Plugins with a pi adapter (`gitauto`), pi agents (`architects`), and the pi-only
+`pi-*` plugins are also a [pi package](https://pi.dev/packages), listed in the
+root `package.json`:
 
 ```sh
 pi install git:github.com/andresbott/ai-extension-collection
 ```
+
+The `architects` agents load through the
+[`pi-subagents`](https://github.com/nicobailon/pi-subagents) extension. They set
+no model, so they run on `subagents.defaultModel` or the parent session's model.
+Pin one per agent with `subagents.agentOverrides.<Name>.model` in pi's
+`settings.json`.
 
 ## Development
 

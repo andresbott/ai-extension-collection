@@ -22,3 +22,10 @@ package), it must also increase the root `package.json` `version`.
 The marketplace and installed plugins may be cached by commit, while their
 version fields are the human-visible update signal. Keeping these versions
 current prevents stale extensions from appearing up to date.
+
+## Keep pi agent twins in sync
+
+An agent in `plugins/<name>/agents/` may have a pi twin in
+`plugins/<name>/pi/agents/` with the same file name. When you change one, make
+the same change in the other; only the frontmatter and tool names differ (see
+DEVELOPMENT.md, "Add pi agents"). `npm run test:pi` checks the pairing.

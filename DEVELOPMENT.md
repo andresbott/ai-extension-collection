@@ -35,6 +35,22 @@ A plugin can also work in pi. Keep both harnesses on one core:
 - Put its tests next to it as `pi/*.test.ts`. Node runs them directly
   (`npm run test:pi`).
 
+## Add pi agents
+
+Claude Code and pi-subagents share the Markdown-plus-frontmatter shape but not
+the fields, so a plugin's agents get a pi twin instead of a shared file:
+
+- Claude Code agents stay in `plugins/<plugin-name>/agents/`.
+- Each pi twin lives in `plugins/<plugin-name>/pi/agents/` with the same file
+  name, the same `name`, and the same prompt body and headings.
+- The pi frontmatter follows pi-subagents: no Claude model alias (`opus`,
+  `sonnet`, `haiku`) — omit `model` to use the operator's model settings; pi tool
+  names (`read, grep, find, ls, bash`) instead of Claude's (`Read, Grep, Glob,
+  Bash`); `advertise: true` so the parent session sees the agent; a description
+  of at most 512 bytes.
+- List the directory in the root `package.json` under `pi.subagents.agents`.
+- `pi/agents.test.ts` checks the pairing, names, headings, and pi frontmatter.
+  Change both twins together.
 ## Add a pi-only plugin
 
 An extension that exists only for pi (no Claude Code equivalent) still lives in
