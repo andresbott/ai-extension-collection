@@ -15,7 +15,8 @@ for reusable extensions.
   `branch-out` (leave main), `open-pr` (flow up to an open pull request), and
   `ship` (full flow through merge, cleanup, and optional tagging).
 - **`gitauto-cmd`** — token-cheap, script-backed Git commands on haiku:
-  `branch-out` and `ship`; an Opus PR writer is used only for complex changes.
+  `branch-out`, `open-pr` (stop at green CI), and `ship` (with an opt-in tag
+  prompt); an Opus PR writer is used only for complex changes.
 - **`go-idioms`** — provides Effective Go and idiomatic Go guidance for writing,
   reviewing, and refactoring Go code.
 
