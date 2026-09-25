@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/odo-coding-pre-tool-use.sh\""
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/coding-guides-pre-tool-use.sh\""
           }
         ]
       }

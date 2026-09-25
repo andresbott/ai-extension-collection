@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Unit tests for odo-coding-pre-tool-use.sh (the coding-guides PreToolUse hook).
+# Unit tests for coding-guides-pre-tool-use.sh (the coding-guides PreToolUse hook).
 # Plain bash — no bats/framework dependency. Feeds crafted tool-call payloads to
 # the hook and asserts the decision (exit 2 = blocked, 0 = allowed) and, for
 # blocks, the reason handed back to the agent.
 #
-#   Run:  bash plugins/coding-guides/hooks/odo-coding-pre-tool-use.test.sh
+#   Run:  bash plugins/coding-guides/hooks/coding-guides-pre-tool-use.test.sh
 #   Exit: 0 = all passed (or skipped), 1 = at least one failure.
 set -uo pipefail
 
 dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-hook="${dir}/odo-coding-pre-tool-use.sh"
+hook="${dir}/coding-guides-pre-tool-use.sh"
 
 if ! command -v jq >/dev/null 2>&1; then
   echo "SKIP: jq not installed — the hook fails open without it, nothing to assert."

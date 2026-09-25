@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "coding-guides",
-  "description": "Injects the user's standing coding conventions (tool-use, git, and skill-handling preferences) into every session via a SessionStart hook, and enforces select rules (e.g. single-line commit messages) via a PreToolUse hook.",
-  "version": "0.1.7",
+  "description": "Injects the user's standing coding conventions (tool-use, git, and skill-handling preferences) into every session via a SessionStart hook, and enforces select rules (e.g. single-line commit messages) via a PreToolUse hook. Ships a pi adapter that does the same from the same files.",
+  "version": "0.2.0",
   "author": {
     "name": "Andres Bott",
     "email": "contact@andresbott.com"
