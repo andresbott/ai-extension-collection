@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "gitauto",
   "description": "Token-cheap Git delivery commands for Claude Code (on haiku) and pi, backed by bundled scripts. `/gitauto:branch-out` leaves main; `/gitauto:open-pr` opens a PR and waits for green CI; `/gitauto:ship` runs the full flow through merge, sync, cleanup, and an opt-in tag prompt. An expensive PR writer is used only for complex changes.",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "author": {
     "name": "Andres Bott",
     "email": "contact@andresbott.com"

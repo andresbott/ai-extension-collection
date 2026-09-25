@@ -16,10 +16,11 @@ and [pi package](https://pi.dev/packages) of reusable extensions.
 | `pi-clear` | pi extension | ❌ | ✅ | `/clear` hides earlier conversation from the model while keeping the session. |
 | `pi-clear-on-exit` | pi extension | ❌ | ✅ | Clears the terminal and its scrollback when interactive pi exits. |
 | `pi-context` | pi extension | ❌ | ✅ | `/context` shows used, free, and total context-window tokens. |
-| `pi-rename` | pi extension | ❌ | ✅ | `/rename "title"` names the session verbatim; bare `/rename` has the model generate a name. |
+| `pi-rename` | pi extension | ❌ | ✅ | `/rename "title"` names the session verbatim; bare `/rename` has Sonnet (or the session model) generate a name. |
 | `pi-render-mode` | pi extension (WIP) | ❌ | 🚧 | Work in progress, not in the pi package yet: `ctrl+r` switches rendering between normal, verbose, and minimal. |
 | `pi-startup-splash` | pi extension | ❌ | ✅ | A startup splash with the model, cwd, context, skills, prompts, and extensions. |
 | `pi-statusline` | pi extension | ❌ | ✅ | A compact footer with model, cwd, git branch, context usage, and session cost. |
+| `pi-summarize` | pi extension | ❌ | ✅ | `/summarize` has Sonnet (or the session model) summarize the conversation into a chat card that is kept in the session but not sent to the model. |
 
 ## Add the marketplace
 
