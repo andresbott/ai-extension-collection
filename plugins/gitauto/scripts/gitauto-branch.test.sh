@@ -29,49 +29,56 @@ actual="$(git -C "$repo" branch --show-current)"
 
 printf 'PASS: explicit name is checked out from main\n'
 
-repo_with_changes="$(mktemp -d)"
-trap 'rm -rf "$repo" "$repo_with_changes"' EXIT
+new_repo() {
+  local dir
+  dir="$(mktemp -d)"
+  git -C "$dir" init -q -b main
+  git -C "$dir" config user.name "Gitauto Test"
+  git -C "$dir" config user.email "gitauto@example.invalid"
+  printf 'base\n' > "$dir/README.md"
+  git -C "$dir" add README.md
+  git -C "$dir" commit -qm "initial commit"
+  printf '%s' "$dir"
+}
 
-git -C "$repo_with_changes" init -q -b main
-git -C "$repo_with_changes" config user.name "Gitauto Test"
-git -C "$repo_with_changes" config user.email "gitauto@example.invalid"
-printf 'base\n' > "$repo_with_changes/README.md"
-git -C "$repo_with_changes" add README.md
-git -C "$repo_with_changes" commit -qm "initial commit"
-printf 'pending change\n' >> "$repo_with_changes/README.md"
+taken_repo="$(new_repo)"
+trap 'rm -rf "$repo" "$taken_repo"' EXIT
+git -C "$taken_repo" branch feat/taken
+git -C "$taken_repo" update-ref refs/remotes/origin/feat/remote-taken HEAD
 
-(
-  cd "$repo_with_changes"
-  "$BRANCH_SCRIPT" >/dev/null
-)
+output="$(cd "$taken_repo" && "$BRANCH_SCRIPT" feat/taken feat/remote-taken 'bad..name' feat/free)"
+actual="$(git -C "$taken_repo" branch --show-current)"
+[[ "$actual" == "feat/free" ]] || fail "expected feat/free, got $actual"
+grep -q '^skipped_existing=feat/taken,feat/remote-taken$' <<<"$output" || fail "missing skipped_existing in: $output"
 
-actual="$(git -C "$repo_with_changes" branch --show-current)"
-[[ "$actual" == "work/readme" ]] || fail "expected work/readme, got $actual"
+printf 'PASS: existing and invalid candidates are skipped in order\n'
 
-printf 'PASS: branch name is inferred from uncommitted changes\n'
+exists_repo="$(new_repo)"
+trap 'rm -rf "$repo" "$taken_repo" "$exists_repo"' EXIT
+git -C "$exists_repo" branch feat/one
+git -C "$exists_repo" branch feat/two
 
-clean_repo="$(mktemp -d)"
-trap 'rm -rf "$repo" "$repo_with_changes" "$clean_repo"' EXIT
+status=0
+output="$(cd "$exists_repo" && "$BRANCH_SCRIPT" feat/one feat/two)" || status=$?
+[[ $status -eq 3 ]] || fail "expected exit 3 when all candidates exist, got $status"
+grep -q '^state=exists$' <<<"$output" || fail "expected state=exists in: $output"
+actual="$(git -C "$exists_repo" branch --show-current)"
+[[ "$actual" == "main" ]] || fail "expected to stay on main, got $actual"
 
-git -C "$clean_repo" init -q -b main
-git -C "$clean_repo" config user.name "Gitauto Test"
-git -C "$clean_repo" config user.email "gitauto@example.invalid"
-printf 'base\n' > "$clean_repo/README.md"
-git -C "$clean_repo" add README.md
-git -C "$clean_repo" commit -qm "initial commit"
+printf 'PASS: state=exists is reported when every candidate is taken\n'
 
-(
-  cd "$clean_repo"
-  "$BRANCH_SCRIPT" >/dev/null
-)
+empty_repo="$(new_repo)"
+trap 'rm -rf "$repo" "$taken_repo" "$exists_repo" "$empty_repo"' EXIT
 
-actual="$(git -C "$clean_repo" branch --show-current)"
-[[ "$actual" == "work/change" ]] || fail "expected work/change, got $actual"
+status=0
+output="$(cd "$empty_repo" && "$BRANCH_SCRIPT")" || status=$?
+[[ $status -eq 2 ]] || fail "expected exit 2 without candidates, got $status"
+grep -q '^state=failed$' <<<"$output" || fail "expected state=failed in: $output"
 
-printf 'PASS: a branch name is invented when no change suggests one\n'
+printf 'PASS: no hardcoded fallback name is invented without candidates\n'
 
 feature_repo="$(mktemp -d)"
-trap 'rm -rf "$repo" "$repo_with_changes" "$clean_repo" "$feature_repo"' EXIT
+trap 'rm -rf "$repo" "$taken_repo" "$exists_repo" "$empty_repo" "$feature_repo"' EXIT
 
 git -C "$feature_repo" init -q -b main
 git -C "$feature_repo" config user.name "Gitauto Test"
