@@ -7,12 +7,12 @@ Guidance for AI agents working in this repository.
 Every commit must increase the marketplace `version` in
 `.claude-plugin/marketplace.json`, regardless of the kind of change.
 
-When a commit changes a plugin, it must also increase that plugin's `version` in
-`plugins/<name>/.claude-plugin/plugin.json`.
+When a commit changes a Claude plugin, it must also increase that plugin's
+`version` in `plugins/<name>/.claude-plugin/plugin.json`.
 
-When a commit changes a pi adapter (`plugins/<name>/pi/`) or the root
-`package.json` (the pi package), it must also increase the root `package.json`
-`version`.
+When a commit changes a pi adapter (`plugins/<name>/pi/`), a pi-only plugin
+(`plugins/pi-<name>/`, no `.claude-plugin/`), or the root `package.json` (the pi
+package), it must also increase the root `package.json` `version`.
 
 - Use semantic versioning (`MAJOR.MINOR.PATCH`).
 - A patch bump is appropriate for small, backward-compatible changes.
