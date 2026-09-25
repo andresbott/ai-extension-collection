@@ -227,3 +227,21 @@ out="$(ship run --title 'Fine title' --subject 'not conventional' --body-stdin <
 grep -q '^DONE state=failed report=--subject must be' <<<"$out" || fail "bad subject: $out"
 [[ -n "$(git -C "$repo" status --porcelain)" ]] || fail "nothing should be committed"
 pass "an invalid subject fails before any mutation"
+
+# prepare cuts the patch at GITAUTO_CMD_PATCH_LINES on purpose, and pipefail
+# must not turn the resulting SIGPIPE into a failed prepare: the command's ! line
+# aborts on any non-zero exit. The patch block's status is that of its last
+# writer, the untracked-file loop, so the failure needs a new file printed after
+# `head` is gone. A tracked diff far past the pipe buffer (>64 KB) guarantees
+# `head` has exited before the loop runs, so the SIGPIPE is certain, not
+# timing-dependent. The exit code is checked directly, since ship() swallows it.
+fixture
+awk 'BEGIN { for (i = 0; i < 4000; i++) printf "line %04d %s\n", i, "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" }' > "$repo/README.md"
+printf 'new\n' > "$repo/new.txt"
+rc=0
+out="$(cd "$repo" && GITAUTO_CMD_PATCH_LINES=1 GITAUTO_CMD_COMPLEX_LINES=100000 "$SCRIPT" prepare '')" || rc=$?
+[[ "$rc" -eq 0 ]] || fail "truncated patch made prepare exit $rc"
+grep -q '^SHIP branch=main .* need=pr writer=cheap$' <<<"$out" || fail "truncated prepare context: $out"
+[[ "$(sed -n '/^--- patch (truncated)$/,$p' <<<"$out")" == $'--- patch (truncated)\ndiff --git a/README.md b/README.md' ]] ||
+  fail "patch should stop after 1 line: $out"
+pass "a patch past GITAUTO_CMD_PATCH_LINES is truncated without failing prepare"

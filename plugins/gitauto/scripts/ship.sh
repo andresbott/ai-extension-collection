@@ -132,10 +132,13 @@ prepare() {
   if [[ "$ahead" -gt 0 ]]; then printf -- '--- commits\n'; git log --oneline "$mb..HEAD" | head -n 15; fi
   printf -- '--- diffstat\n'; git diff --stat=100 "$mb" | tail -n 30
   printf -- '--- patch (truncated)\n'
+  # Display only, cut short on purpose: once `head` has its lines, writers still
+  # running die of SIGPIPE and pipefail reports 141. The command's ! line aborts
+  # on any non-zero exit, so the intended cut must not count as a failure.
   {
     git diff "$mb"
     untracked | while IFS= read -r f; do printf '+++ new file %s\n' "$f"; head -n 20 -- "$f"; done
-  } | head -n "$PATCH_LINES"
+  } | head -n "$PATCH_LINES" || true
 }
 
 one_line() { [[ -n "$1" && "$1" != *$'\n'* && "$1" != *$'\r'* ]]; }
