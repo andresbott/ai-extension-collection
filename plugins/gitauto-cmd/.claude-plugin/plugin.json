@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "gitauto-cmd",
+  "description": "Token-cheap Git delivery commands. `/gitauto-cmd:branch-out` leaves main via a bundled script; the model only invents a branch name when one is needed, on haiku, in a single call.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Andres Bott",
+    "email": "contact@andresbott.com"
+  }
+}
