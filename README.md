@@ -12,6 +12,7 @@ for reusable extensions.
 | `doc-authoring` | Skill | `agents-documentation` | Helps create and maintain internal, agent-facing project documentation. |
 | `gitauto` | Slash commands, Agent | `/branch-out`, `/open-pr`, `/ship`; `pr-writer` agent | Token-cheap, script-backed Git commands on haiku: `open-pr` stops at green CI, `ship` has an opt-in tag prompt; an Opus PR writer is used only for complex changes. |
 | `go-idioms` | Skills | `effective-go`, `golang-patterns` | Effective Go and idiomatic Go guidance for writing, reviewing, and refactoring Go code. |
+| `session-sounds` | Hooks | `Stop`, `Notification` sounds | Plays a bundled sound (via `paplay`) when Claude finishes responding and on notifications. |
 
 ## Add the marketplace
 
