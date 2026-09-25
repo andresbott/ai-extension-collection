@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "gitauto",
-  "description": "Guarded Git delivery commands. Each step (branch, verify, commit, push, open-pr, wait-ci, merge, sync-main, cleanup, tag) is a slash command backed by a deterministic bash helper that enforces branch safety, and `/gitauto:ship` runs the whole flow in order.",
-  "version": "0.1.0",
+  "description": "Guarded Git delivery: `/gitauto:branch-out` leaves main, `/gitauto:open-pr` runs the flow up to an open pull request, and `/gitauto:ship` runs the whole flow through merge, cleanup, and optional tag. Every stage is backed by a deterministic bash helper that enforces branch safety.",
+  "version": "0.2.0",
   "author": {
     "name": "Andres Bott",
     "email": "contact@andresbott.com"
