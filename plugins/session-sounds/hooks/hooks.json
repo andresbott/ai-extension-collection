@@ -1,0 +1,24 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "paplay \"${CLAUDE_PLUGIN_ROOT}/sounds/done.mp3\""
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "paplay \"${CLAUDE_PLUGIN_ROOT}/sounds/notification.oga\""
+          }
+        ]
+      }
+    ]
+  }
+}
