@@ -1,17 +1,17 @@
 # ai-extension-collection
 
 A [Claude Code plugin marketplace](https://code.claude.com/docs/en/plugin-marketplaces)
-for reusable extensions.
+and [pi package](https://pi.dev/packages) of reusable extensions.
 
 ## Available plugins
 
 | Plugin | Type | Claude Code | pi | Description |
 | --- | --- | :---: | :---: | --- |
-| `architects` | Agents | ✅ | ❌ | Specialist agents for Go, Vue and TypeScript, OpenAPI, dependency layering, and project setup validation. |
-| `coding-guides` | Hooks | ✅ | ❌ | Injects standing coding conventions and enforces selected tool-use rules. |
-| `doc-authoring` | Skill | ✅ | ❌ | Helps create and maintain internal, agent-facing project documentation. |
+| `architects` | Agents | ✅ | ✅ | Specialist agents for Go, Vue and TypeScript, OpenAPI, dependency layering, and project setup validation. In pi they need [`pi-subagents`](https://github.com/nicobailon/pi-subagents). |
+| `coding-guides` | Hooks, pi extension | ✅ | ✅ | Injects standing coding conventions and enforces selected tool-use rules. |
+| `doc-authoring` | Skill | ✅ | ✅ | Helps create and maintain internal, agent-facing project documentation. |
 | `gitauto` | Slash commands, Agent, pi extension | ✅ | ✅ | Token-cheap, script-backed Git commands for Claude Code (on haiku) and pi: `open-pr` stops at green CI, `ship` has an opt-in tag prompt; an expensive PR writer is used only for complex changes. |
-| `go-idioms` | Skills | ✅ | ❌ | Effective Go and idiomatic Go guidance for writing, reviewing, and refactoring Go code. |
+| `go-idioms` | Skills | ✅ | ✅ | Effective Go and idiomatic Go guidance for writing, reviewing, and refactoring Go code. |
 | `session-sounds` | Hooks | ✅ | ❌ | Plays a bundled sound (via `paplay`) when Claude finishes responding and on notifications. |
 | `pi-clear` | pi extension | ❌ | ✅ | `/clear` hides earlier conversation from the model while keeping the session. |
 | `pi-clear-on-exit` | pi extension | ❌ | ✅ | Clears the terminal and its scrollback when interactive pi exits. |
@@ -39,12 +39,19 @@ After a plugin is published, install it with:
 
 ## Use it in pi
 
-Plugins with a pi adapter (`gitauto`) and the pi-only `pi-*` plugins are also a
-[pi package](https://pi.dev/packages), listed in the root `package.json`:
+Plugins with a pi adapter (`coding-guides`, `gitauto`), pi agents (`architects`),
+skills (`doc-authoring`, `go-idioms`), and the pi-only `pi-*` plugins are also
+a [pi package](https://pi.dev/packages), listed in the root `package.json`:
 
 ```sh
 pi install git:github.com/andresbott/ai-extension-collection
 ```
+
+The `architects` agents load through the
+[`pi-subagents`](https://github.com/nicobailon/pi-subagents) extension. They set
+no model, so they run on `subagents.defaultModel` or the parent session's model.
+Pin one per agent with `subagents.agentOverrides.<Name>.model` in pi's
+`settings.json`.
 
 ## Development
 
