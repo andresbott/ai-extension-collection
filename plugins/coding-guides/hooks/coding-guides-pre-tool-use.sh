@@ -6,34 +6,60 @@
 # retries correctly.
 #
 # Add new rules as check_* functions and call them from run_checks().
-# Requires jq; if jq is missing it fails open (allows the call) so a missing
-# dependency never blocks the shell. The -m checks use GNU grep (-P/-z).
+# Portable across GNU, BSD/macOS and BusyBox: matching uses bash's built-in
+# [[ =~ ]] (POSIX ERE) and `grep -oE`, with no GNU-only flags. Needs jq to parse
+# the payload; without it, git commit calls are blocked with an install hint
+# (they can't be verified) and every other call is allowed.
 set -euo pipefail
 
+ONE_LINE_FIX='Use a single one-line message: git commit -m "<type>: one-line summary"'
+
 deny() {
-  # $1: reason (fed back to the agent). Followed by the fix, so every rule
-  # nudges toward the same corrected form.
-  printf 'BLOCKED by coding-guides: %s\n%s\n' \
-    "$1" \
-    'Use a single one-line message: git commit -m "<type>: one-line summary"' >&2
+  # $1: reason (fed back to the agent). $2: how to fix it; defaults to the
+  # one-line form, so every commit rule nudges toward the same corrected command.
+  printf 'BLOCKED by coding-guides: %s\n%s\n' "$1" "${2:-$ONE_LINE_FIX}" >&2
   exit 2
 }
 
-command -v jq >/dev/null 2>&1 || exit 0   # fail open when jq is unavailable
+# A `git commit` invocation; `git commit-graph` and the like don't match.
+COMMIT_RE='(^|[^[:alnum:]])git[[:space:]]+commit($|[[:space:]])'
 
 input="$(cat)"
+
+# Without jq the payload can't be parsed, so the commit rules can't run. Fail
+# closed only for what they guard: a Bash call whose raw JSON mentions
+# `git commit` (JSON \n and \t escapes read as spaces, so a commit on its own
+# line still counts; errs toward blocking). Everything else passes, so the agent
+# can still run the command that installs jq.
+require_jq() {
+  command -v jq >/dev/null 2>&1 && return 0
+  local tool_re='"tool_name"[[:space:]]*:[[:space:]]*"Bash"'
+  local raw="${input//\\n/ }"
+  raw="${raw//\\t/ }"
+  if [[ "$raw" =~ $tool_re && "$raw" =~ $COMMIT_RE ]]; then
+    deny 'jq is not installed, so the commit message cannot be checked for a single line' \
+      'Install jq (e.g. apt install jq, dnf install jq, brew install jq), then retry the commit.'
+  fi
+  exit 0
+}
+require_jq
+
 tool_name="$(jq -r '.tool_name // empty' <<<"$input")"
 cmd="$(jq -r '.tool_input.command // empty' <<<"$input")"
 
 # Rule: git commit messages must be a single line.
 check_single_line_commit() {
   [[ "$tool_name" == "Bash" ]] || return 0
-  [[ "$cmd" =~ (^|[^[:alnum:]])git[[:space:]]+commit($|[[:space:]]) ]] || return 0
+  [[ "$cmd" =~ $COMMIT_RE ]] || return 0
 
   # A -m / --message value that spans a newline (double- or single-quoted).
   # Also catches the heredoc-in-message form: -m "$(cat <<EOF ... )".
-  if grep -Pzq '(?:-m|--message)[ =]*"[^"]*\n' <<<"$cmd" 2>/dev/null \
-     || grep -Pzq "(?:-m|--message)[ =]*'[^']*\n" <<<"$cmd" 2>/dev/null; then
+  # In bash's regex a newline is an ordinary character, so [^"] runs across
+  # lines; no grep -z/-P needed.
+  local nl=$'\n'
+  local dq_re="(-m|--message)[ =]*\"[^\"]*${nl}"
+  local sq_re="(-m|--message)[ =]*'[^']*${nl}"
+  if [[ "$cmd" =~ $dq_re || "$cmd" =~ $sq_re ]]; then
     deny 'commit -m message spans multiple lines'
   fi
 
