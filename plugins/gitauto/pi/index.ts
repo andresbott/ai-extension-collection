@@ -2,9 +2,14 @@
 // /gitauto:ship. The flows (flow.ts) are harness-free; this file binds them to
 // pi: the bundled scripts, nested model calls, the tag question, and progress.
 //
-// Models: GITAUTO_CHEAP_MODEL writes branch names, messages, and small PR texts;
-// GITAUTO_EXPERT_MODEL runs the shared pr-writer prompt for complex changes.
-// Both take `provider/id` (or a bare id) and default to the session's model.
+// Models, as in Claude Code (haiku for the command, opus for pr-writer):
+// - simple texts (branch names, messages, small PR texts, failure diagnosis) use
+//   a cheap model picked by ./models.ts, falling back to the session's model;
+// - complex PR titles and bodies, written by the pr-writer expert, use the
+//   session's model: the stronger model the user chose. If it saves no draft
+//   (a failure or a refusal), the cheap writer takes over.
+// GITAUTO_CHEAP_MODEL / GITAUTO_EXPERT_MODEL (`provider/id` or a bare id)
+// optionally override either role.
 import { execFileSync, spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
@@ -13,6 +18,7 @@ import { fileURLToPath } from "node:url";
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 
 import { branchOut, ship, type Deps, type Script, type ScriptResult } from "./flow.ts";
+import { findModel, pickCheapModel } from "./models.ts";
 import { WRITE_SYSTEM_PROMPT, parseTexts, stripFrontmatter } from "./protocol.ts";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -95,7 +101,9 @@ function makeDeps(ctx: ExtensionCommandContext, progress: Progress): Deps {
     script: (name, args, opts) =>
       runScript(ctx.cwd, name, args, opts, (line) => line.startsWith("ship:") && progress.add(line)),
     write: async (context, keys) => {
-      const reply = await complete(ctx, resolveModel(ctx, "GITAUTO_CHEAP_MODEL"), WRITE_SYSTEM_PROMPT, context);
+      const model = resolveModel(ctx, "GITAUTO_CHEAP_MODEL");
+      progress.add(`gitauto: writing with ${model.provider}/${model.id}`);
+      const reply = await complete(ctx, model, WRITE_SYSTEM_PROMPT, context);
       return parseTexts(reply, keys);
     },
     expert: (base) => runExpert(ctx, base),
@@ -140,19 +148,20 @@ function runScript(
   });
 }
 
-/** `provider/id` or a bare id from the env var, else the session's model. */
+/**
+ * The model for a cheap nested call: the env override if set, else a cheap
+ * available model (see ./models.ts), else the session's model.
+ */
 function resolveModel(ctx: ExtensionCommandContext, envName: string): Model {
+  const available = ctx.modelRegistry.getAvailable();
   const spec = process.env[envName]?.trim();
-  if (!spec) {
-    if (!ctx.model) throw new Error(`no model selected; select one or set ${envName}`);
-    return ctx.model;
+  if (spec) {
+    const model = findModel(available, spec);
+    if (!model) throw new Error(`${envName}=${spec} is not an available model`);
+    return model;
   }
-  const slash = spec.indexOf("/");
-  const model =
-    slash > 0
-      ? ctx.modelRegistry.find(spec.slice(0, slash), spec.slice(slash + 1))
-      : ctx.modelRegistry.getAvailable().find((m) => m.id === spec);
-  if (!model) throw new Error(`${envName}=${spec} is not an available model`);
+  const model = pickCheapModel(available, ctx.model?.provider) ?? ctx.model;
+  if (!model) throw new Error(`no model available; select one or set ${envName}`);
   return model;
 }
 
@@ -169,6 +178,7 @@ async function complete(ctx: ExtensionCommandContext, model: Model, systemPrompt
 
 /** A one-shot pi process with the shared pr-writer prompt; it saves the draft itself. */
 async function runExpert(ctx: ExtensionCommandContext, base: string): Promise<boolean> {
+  // The stronger model, not the cheap one: the override, else the session's model.
   const model = process.env.GITAUTO_EXPERT_MODEL?.trim() || (ctx.model && `${ctx.model.provider}/${ctx.model.id}`);
   const args = [
     "--print",

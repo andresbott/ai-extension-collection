@@ -1,6 +1,6 @@
 {
   "name": "ai-extension-collection",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "private": true,
   "description": "Pi package for the ai-extension-collection plugins that ship a pi adapter, pi-only extension, pi agents (plugins/<name>/pi/), or Agent Skills (plugins/<name>/skills/).",
   "type": "module",
@@ -16,6 +16,7 @@
       "./plugins/pi-clear/pi/index.ts",
       "./plugins/pi-clear-on-exit/pi/index.ts",
       "./plugins/pi-context/pi/index.ts",
+      "./plugins/pi-rename/pi/index.ts",
       "./plugins/pi-startup-splash/pi/index.ts",
       "./plugins/pi-statusline/pi/index.ts"
     ],
