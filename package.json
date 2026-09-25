@@ -1,8 +1,8 @@
 {
   "name": "ai-extension-collection",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
-  "description": "Pi package for the ai-extension-collection plugins that ship a pi adapter, pi-only extension, or pi agents (plugins/<name>/pi/).",
+  "description": "Pi package for the ai-extension-collection plugins that ship a pi adapter, pi-only extension, pi agents (plugins/<name>/pi/), or Agent Skills (plugins/<name>/skills/).",
   "type": "module",
   "keywords": ["pi-package"],
   "scripts": {
@@ -17,6 +17,10 @@
       "./plugins/pi-context/pi/index.ts",
       "./plugins/pi-startup-splash/pi/index.ts",
       "./plugins/pi-statusline/pi/index.ts"
+    ],
+    "skills": [
+      "./plugins/doc-authoring/skills",
+      "./plugins/go-idioms/skills"
     ],
     "subagents": {
       "agents": ["./plugins/architects/pi/agents"]

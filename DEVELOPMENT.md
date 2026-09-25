@@ -35,6 +35,18 @@ A plugin can also work in pi. Keep both harnesses on one core:
 - Put its tests next to it as `pi/*.test.ts`. Node runs them directly
   (`npm run test:pi`).
 
+## Share skills with pi
+
+Skills follow the [Agent Skills](https://agentskills.io/specification) standard,
+which Claude Code and pi both implement, so one `SKILL.md` serves both:
+
+- Keep the skill in `plugins/<plugin-name>/skills/<skill-name>/SKILL.md`, with
+  `name` matching the directory and a description of at most 1024 characters.
+- Do not name harness-specific tools or variables (`AskUserQuestion`,
+  `${CLAUDE_PLUGIN_ROOT}`); reference bundled files by relative path.
+- List the `skills/` directory in the root `package.json` under `pi.skills`. No
+  pi twin is needed.
+
 ## Add pi agents
 
 Claude Code and pi-subagents share the Markdown-plus-frontmatter shape but not

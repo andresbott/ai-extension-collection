@@ -9,9 +9,9 @@ for reusable extensions.
 | --- | --- | :---: | :---: | --- |
 | `architects` | Agents | ✅ | ✅ | Specialist agents for Go, Vue and TypeScript, OpenAPI, dependency layering, and project setup validation. In pi they need [`pi-subagents`](https://github.com/nicobailon/pi-subagents). |
 | `coding-guides` | Hooks | ✅ | ❌ | Injects standing coding conventions and enforces selected tool-use rules. |
-| `doc-authoring` | Skill | ✅ | ❌ | Helps create and maintain internal, agent-facing project documentation. |
+| `doc-authoring` | Skill | ✅ | ✅ | Helps create and maintain internal, agent-facing project documentation. |
 | `gitauto` | Slash commands, Agent, pi extension | ✅ | ✅ | Token-cheap, script-backed Git commands for Claude Code (on haiku) and pi: `open-pr` stops at green CI, `ship` has an opt-in tag prompt; an expensive PR writer is used only for complex changes. |
-| `go-idioms` | Skills | ✅ | ❌ | Effective Go and idiomatic Go guidance for writing, reviewing, and refactoring Go code. |
+| `go-idioms` | Skills | ✅ | ✅ | Effective Go and idiomatic Go guidance for writing, reviewing, and refactoring Go code. |
 | `session-sounds` | Hooks | ✅ | ❌ | Plays a bundled sound (via `paplay`) when Claude finishes responding and on notifications. |
 | `pi-clear` | pi extension | ❌ | ✅ | `/clear` hides earlier conversation from the model while keeping the session. |
 | `pi-clear-on-exit` | pi extension | ❌ | ✅ | Clears the terminal and its scrollback when interactive pi exits. |
@@ -39,9 +39,9 @@ After a plugin is published, install it with:
 
 ## Use it in pi
 
-Plugins with a pi adapter (`gitauto`), pi agents (`architects`), and the pi-only
-`pi-*` plugins are also a [pi package](https://pi.dev/packages), listed in the
-root `package.json`:
+Plugins with a pi adapter (`gitauto`), pi agents (`architects`), skills
+(`doc-authoring`, `go-idioms`), and the pi-only `pi-*` plugins are also a
+[pi package](https://pi.dev/packages), listed in the root `package.json`:
 
 ```sh
 pi install git:github.com/andresbott/ai-extension-collection
