@@ -14,6 +14,8 @@ for reusable extensions.
 - **`gitauto`** — provides three guarded Git delivery slash commands:
   `branch-out` (leave main), `open-pr` (flow up to an open pull request), and
   `ship` (full flow through merge, cleanup, and optional tagging).
+- **`gitauto-cmd`** — token-cheap, script-backed Git commands; currently
+  `branch-out`, where the model only proposes a branch name when one is needed.
 - **`go-idioms`** — provides Effective Go and idiomatic Go guidance for writing,
   reviewing, and refactoring Go code.
 
