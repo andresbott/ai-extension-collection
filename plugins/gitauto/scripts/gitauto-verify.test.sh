@@ -128,6 +128,43 @@ printf 'PASS: Go module runs standard test and vet checks\n'
 
 repo="$(new_repo)"
 repos+=("$repo")
+printf '<project/>\n' > "$repo/pom.xml"
+cat > "$repo/mvnw" <<'EOF'
+#!/usr/bin/env bash
+printf 'mvnw %s\n' "$*" >> commands.log
+EOF
+chmod +x "$repo/mvnw"
+output="$( (cd "$repo" && "$VERIFY_SCRIPT") 2>&1)" || fail "Maven wrapper checks should pass: $output"
+[[ "$(cat "$repo/commands.log")" == "mvnw -B verify" ]] || fail "Maven wrapper was not run with verify: $(cat "$repo/commands.log")"
+[[ "$output" == *"command=./mvnw -B verify"* ]] || fail "Maven wrapper was not reported: $output"
+[[ "$output" == *"state=pass"* ]] || fail "Maven wrapper did not return pass: $output"
+
+printf 'PASS: Maven project prefers the Maven wrapper and runs verify\n'
+
+repo="$(new_repo)"
+repos+=("$repo")
+printf '<project/>\n' > "$repo/pom.xml"
+fake_bin="$(mktemp -d)"
+repos+=("$fake_bin")
+cat > "$fake_bin/mvn" <<'EOF'
+#!/usr/bin/env bash
+printf 'mvn %s\n' "$*" >> commands.log
+exit 3
+EOF
+chmod +x "$fake_bin/mvn"
+set +e
+output="$( (cd "$repo" && PATH="$fake_bin:$PATH" "$VERIFY_SCRIPT") 2>&1)"
+status=$?
+set -e
+[[ $status -eq 3 ]] || fail "failing mvn should propagate its exit status, got $status: $output"
+[[ "$(cat "$repo/commands.log")" == "mvn -B verify" ]] || fail "mvn was not run with verify: $(cat "$repo/commands.log")"
+[[ "$output" == *"command=mvn -B verify"* ]] || fail "mvn was not reported: $output"
+[[ "$output" == *"state=fail"* ]] || fail "mvn failure state was not reported: $output"
+
+printf 'PASS: Maven project falls back to mvn on PATH and reports failure\n'
+
+repo="$(new_repo)"
+repos+=("$repo")
 before_branch="$(git -C "$repo" branch --show-current)"
 before_head="$(git -C "$repo" rev-parse HEAD)"
 before_status="$(git -C "$repo" status --porcelain=v1)"

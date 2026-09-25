@@ -117,5 +117,24 @@ if [[ -f go.mod ]] && command -v go >/dev/null 2>&1; then
   exit 0
 fi
 
+if [[ -f pom.xml ]]; then
+  maven=()
+  if [[ -x ./mvnw ]]; then
+    maven=(./mvnw)
+  elif command -v mvn >/dev/null 2>&1; then
+    maven=(mvn)
+  fi
+  if ((${#maven[@]})); then
+    if run_command "${maven[0]} -B verify" "${maven[@]}" -B verify; then
+      printf 'state=pass\n'
+      exit 0
+    else
+      status=$?
+      printf 'state=fail\n'
+      exit "$status"
+    fi
+  fi
+fi
+
 printf 'state=skip\n'
 printf 'report=no verification checks discovered\n'

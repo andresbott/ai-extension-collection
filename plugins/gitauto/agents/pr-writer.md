@@ -1,6 +1,6 @@
 ---
 name: pr-writer
-description: Writes the pull request title, Conventional squash subject, and body for a large or multi-area change being shipped by /gitauto-cmd:ship or /gitauto-cmd:open-pr. Internal to gitauto-cmd; launched only when the preflight rates the change as complex.
+description: Writes the pull request title, Conventional squash subject, and body for a large or multi-area change being shipped by /gitauto:ship or /gitauto:open-pr. Internal to gitauto; launched only when the preflight rates the change as complex.
 model: opus
 tools: Bash, Read, Grep, Glob
 ---

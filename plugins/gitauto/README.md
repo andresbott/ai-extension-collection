@@ -1,141 +1,186 @@
 # gitauto
 
-A guarded Git delivery suite with three commands. Every step of the flow —
-branch, verify, commit, push, open a pull request, wait for CI, merge,
-synchronize the default branch, clean up, tag — is backed by a deterministic
-bash helper that owns the mutation and enforces its own safety checks. The
-individual steps are internal stages, not commands.
+Token-cheap Git delivery commands: plain slash commands on `haiku` plus bash
+scripts. The scripts do the work; the model only writes the prose a script
+can't: branch names, commit messages, and pull request descriptions. An
+expensive model is used only when a PR description is genuinely hard to write.
 
 ## Commands
 
 | Command | Arguments | Behaviour |
 |---|---|---|
-| `/gitauto:branch-out` | `[branch name]` | On `main`/`master`, creates and checks out a feature branch; otherwise leaves the current branch unchanged. |
-| `/gitauto:open-pr` | `[branch=] [message=] [title=] [body=] [base=] [remote=]` | Runs the ship flow up to and including `open-pr`, then stops: no CI wait, merge, or tag. |
-| `/gitauto:ship` | `[branch=] [message=] [title=] [body=] [subject=] [base=] [remote=] [deleteRemote=] [tag=<semver>\|no tag]` | Runs the full flow in order and keeps a stage ledger (see below). |
+| `/gitauto:branch-out` | `[branch name]` | On `main`/`master`/the default branch, creates and checks out a feature branch; otherwise leaves the current branch unchanged. |
+| `/gitauto:open-pr` | `[branch name]` | branch → verify → commit → push → open (or reuse) PR → wait for CI; stops at green (`READY`). Never merges. |
+| `/gitauto:ship` | `[branch name] [tag=<semver> \| no tag] [deleteRemote=true]` | The same flow, then squash-merge → sync main → cleanup → offer a release tag (never tags by default). |
 
-Arguments may be `key=value` pairs or plain language. For `ship`, an explicit
-version tags the release; declining a tag in any wording (`/gitauto:ship dont
-create tag`) skips tagging and the command never asks about a tag.
+`open-pr` then `ship` is the review-first path: `open-pr` gets the PR green, and
+a later `ship` finds it open with a clean tree (`need=none`). It skips verify,
+reuses the PR, and merges with the subject saved in the PR, so no text has to
+be written the second time.
 
-## Stages
-
-Every stage agent runs on `haiku` by default; pass `"model"` in the workflow
-args to override it.
-
-| Stage | Behaviour |
-|---|---|
-| `branch` | On `main`/`master`, creates and checks out a feature branch; an explicit name wins, otherwise the model proposes 5 candidate names in one shot (from the uncommitted changes, or invented when there are none) and the helper checks out the first that does not already exist locally or on `origin`; if all are taken it asks for 5 new names, up to 3 rounds. Existing feature branches are left unchanged. |
-| `verify` | Prefers a `verify` Make target, then declared `test`, `lint`, `vet`, and `check` targets, then package scripts or standard Go module checks. Stops on the first failure and returns `pass`, `fail`, or `skip`. |
-| `commit` | On a feature branch, stages everything and creates exactly one commit with a one-line message (supplied verbatim, or composed from the diff). No body, no `Co-Authored-By`. Clean trees are unchanged; `main`, `master`, and detached HEAD are blocked before staging. |
-| `push` | Pushes the current feature branch and configures its upstream, re-checking the protected-branch guard immediately before pushing. Defaults to `origin`. |
-| `open-pr` | Reuses an existing open pull request or creates one for the current branch. Merged and closed pull requests stay distinct, and lookup failures never fall through to creation. A missing title or body is composed as a compact `## Summary` / `## What` / optional `## Notes` description. |
-| `wait-ci` | Watches the pull request checks and returns `green`, `failed`, `none`, `pending`, or `blocked`. "No checks configured" stays distinct from a failure. |
-| `merge` | Squash-merges the pull request with a validated Conventional Commit subject, after confirming the head matches the current branch and checks are green or explicitly absent. Already-merged pull requests are idempotent. |
-| `sync-main` | Locates the primary worktree, refuses to overwrite a dirty one, switches it to the default branch, fetches, and fast-forwards only. |
-| `cleanup` | Prunes remote state and removes clean, inactive worktrees for the merged branch. The local branch is always kept, remote deletion requires an explicit `deleteRemote=true`, and active or dirty worktrees are deferred and reported as partial. |
-| `tag` | Only with an explicit, strictly increasing version: runs from the synchronized primary default-branch worktree and authorizes the repository's `make tag` target. |
-
-`/gitauto:ship` runs the stages in exactly this order:
+## How branch-out stays cheap
 
 ```text
-branch → verify → commit → push → open-pr → wait-ci → merge → sync-main → cleanup → optional tag
+/gitauto:branch-out  →  !`branch-out.sh`  →  (only if needed) branch-out.sh --create
 ```
 
-A failed required pre-merge stage stops the flow immediately and the partial
-ledger is still reported. An already-merged pull request skips the redundant
-wait-ci and merge stages and continues with synchronization and cleanup. A
-cleanup or tag failure after a successful merge is reported as `partial` — never
-as a merge failure. Remote deletion happens only with `deleteRemote=true`, and
-tagging only when an explicit `tag=<version>` was supplied.
+- **`!` preprocessing** runs `scripts/branch-out.sh` before the model sees the
+  prompt, so there's no exploratory tool call.
+- **Zero-tool paths.** Already on a feature branch, or given a valid explicit
+  name: the script finishes during preprocessing and prints one `DONE` line.
+- **One tool call otherwise.** The script prints `NEED_NAME` and at most 25
+  lines of `git status --short`. The model proposes 3 names and calls `--create`
+  once.
+- **No retry rounds.** If every candidate is taken, the script tries `-2`…`-9`
+  suffixes on the first valid one.
 
-Every command ends its response with a fenced `text` block of `key=value` lines
-mirroring the helper output, so the result is machine-readable and cannot be
-softened in prose.
-
-## Safety model
-
-Each command is a thin launcher. The real work runs in three layers:
+## How ship stays cheap
 
 ```text
-/gitauto:<command>  →  workflows/flow.js  →  scripts/gitauto-<stage>.sh
-      command            dynamic workflow      deterministic helper
+/gitauto:ship  →  !`ship.sh prepare`  →  [pr-writer agent]  →  ship.sh run (foreground, resumable)
 ```
 
-The command exists only to resolve `${CLAUDE_PLUGIN_ROOT}` and hand the workflow
-a `root` pointing at `scripts/`; a workflow cannot resolve that variable itself.
-Every command launches the same workflow and passes `until` (`branch`,
-`open-pr`, or `ship`) to choose how far it runs. The workflow owns each stage's
-prompt and a JSON output schema the runtime validates and retries against. The
-helper owns every mutation.
+1. **`prepare`** (preprocessing, no mutation) checks the guards and `gh` auth,
+   sizes the change against the default branch, and prints a `SHIP` line:
+   `need=pr|message|none` says what text is missing, and `writer=cheap|expert`
+   says who writes it. For the cheap writer it appends status, commits,
+   diffstat, and a patch truncated to 200 lines. Nothing to ship prints `DONE`.
+2. **Writing the text:**
+   - `writer=cheap`: haiku writes the prose title, the Conventional subject,
+     the body, or the message from that context.
+   - `writer=expert`: haiku launches the `pr-writer` agent (**`model: opus`**).
+     It reads the repository itself and saves the draft with `ship.sh draft`, so
+     haiku never re-types the body.
+   - An already-open PR only needs a commit message; a clean tree needs nothing.
+3. **`run`** is a normal foreground tool call. It chains the helpers and blocks
+   inside the script on `gh pr checks --watch`, so the model doesn't poll in a
+   loop and reads the output only once, when the call returns.
 
-The split below is deliberate and identical across all stages:
+## Foreground runs and slow CI
 
-- **The bash helpers in `scripts/` own every mutation.** Staging, committing,
-  branching, pushing, pull request creation, merging, fetching, fast-forwarding,
-  worktree removal, and tagging happen only inside a helper.
-- **The helpers own discovery and guards.** They resolve the remote default
-  branch without mutating refs (cached remote HEAD, remote symref, `gh`, then
-  local `main`/`master` only when the remote is unconfigured), treat `main`,
-  `master`, and the resolved default branch as protected, refuse to act on a
-  detached HEAD, refuse when a configured `origin` has an unresolvable default
-  branch, and re-check branch safety immediately before the mutating step.
-- **The agent only chooses names, messages, and prose.** It may inspect the
-  repository with read-only commands (`git status`, `git log`, `git diff`,
-  `git branch`, `git worktree list`, `gh pr view`) to compose a branch name, a
-  commit message, a pull request title and body, or a Conventional Commit
-  subject — then it calls the helper once and reports what the helper printed.
-- **Each helper runs at most once per command.** Commands are explicitly
-  forbidden from re-running a helper to work around a `blocked` or `failed`
-  result.
+The command never uses `run_in_background`, so the session waits until the run
+finishes; you can still interrupt it. Claude Code caps a foreground Bash call at
+10 minutes, so `run` stays within a budget of `GITAUTO_CMD_RUN_BUDGET` seconds
+(default 540). The CI wait gets whatever time is left, and at least
+`GITAUTO_CMD_CI_MIN` seconds (default 30).
 
-The workflow is named `flow-run` so it does not collide with any command name.
-Without a distinct name the slash command resolves to the workflow instead of
-the command, which launches it with no `root`. Claude Code exposes every plugin
-workflow by name, so `/gitauto:flow-run` is also listed; it is internal — use
-the three commands.
+If CI is still running when the budget runs out, `run` exits with
+`WAITING stage=wait-ci pr=#N ...`. The command then runs `ship.sh run` again
+with the same `--tag` and `--delete-remote` flags, up to 5 more times. A re-run
+resumes where the last one stopped:
 
-## Claude Code
+- A clean `HEAD` that is already on its upstream skips verify and commit,
+  because it was verified before it was pushed.
+- The push is a no-op, and the open PR is reused.
+- The merge subject comes from `--subject`, the one saved in the PR body, or a
+  Conventional PR title.
 
-Install the plugin from the marketplace and the commands appear as
-`/gitauto:branch-out`, `/gitauto:open-pr`, and `/gitauto:ship`:
+Each extra round is one short tool call.
+
+## Release tag prompt
+
+`ship` never creates a tag unless you explicitly choose one.
+
+- With `tag=<semver>` in the arguments, it tags straight away through `make tag`,
+  without asking.
+- With `no tag` (in any wording), it doesn't ask; the result shows `tag=declined`.
+- Otherwise, if the repo has a `make tag` target, `run` only *recommends*. It
+  ends with `tag=ask tag_recommended=<v> tag_options=<recommended>,<others>
+  latest=<v>`. The recommendation comes from the merge subject: `feat` is a
+  minor bump, `!` is a major one (a minor one before 1.0), anything else is a
+  patch.
+- The command then asks once with `AskUserQuestion`. **"No tag" is the first
+  option**, followed by each option, with the recommended one marked
+  "(suggested)". Only an explicitly chosen or typed version runs
+  `ship.sh tag <v>`, from the primary worktree. Any other answer, or none,
+  means no tag.
+- Repos without a `make tag` target are never asked (`tag=none`).
+
+## Progress and failures
+
+- **Progress:** `run` prints a `ship: started; live output: tail -f <log>` line,
+  then `ship: [n] <stage> ...` and `ship: [n] <stage> -> <state>` for each
+  stage. `tail -f` the log for full live output, including the CI watch.
+- **Failures come back into the session.** When verification or CI fails,
+  `run` prints a `--- failure` block just before the final line. For verify,
+  it holds the last 60 lines of its output. For CI, it holds the failed check
+  names and the last 60 lines of up to 2 failed runs'
+  `gh run view --log-failed`, with timestamps stripped. The command quotes the
+  block and names the likely cause without trying a fix, so you can ask the
+  session to fix it and ship again (the existing PR is reused). The number of
+  lines is set by `GITAUTO_CMD_FAIL_LINES`.
+
+A change is **complex** when it touches more than 10 files, more than 400
+lines, or more than 3 top-level directories. You can override these limits
+with `GITAUTO_CMD_COMPLEX_FILES`, `GITAUTO_CMD_COMPLEX_LINES`, and
+`GITAUTO_CMD_COMPLEX_DIRS`. `GITAUTO_CMD_PATCH_LINES` sets the size of the
+cheap writer's patch.
+
+## Titles and subjects
+
+A PR title is **plain prose** (`Add a discovery view for albums`). The squash
+subject is a separate **Conventional Commit** line
+(`feat(webui): add discovery view`). The writer (haiku, or the Opus
+`pr-writer`) produces both in one pass, so it costs about one extra output line.
+
+- **Saved in the PR.** `run` adds `<!-- gitauto-subject: <subject> -->` to the
+  PR body. A later `ship`, in any session, reads it back without a model.
+- **Uses.** The subject is the commit message by default, the squash subject
+  (`<subject> (#N)`), and the signal for the tag bump.
+- **Where the merge subject comes from**, in order: `--subject`, then the
+  subject saved in the PR body, then a PR title that is already Conventional.
+- **Fallback for PRs without one** (opened by hand, or before this change) that
+  have a prose title: `prepare` reports `need=subject` with a `pr_title:` line,
+  and haiku reshapes that one line. If `run` still has no subject, it stops
+  with `state=needs-subject` *before* waiting on CI.
+- **Validation.** An invalid `--subject` fails before any mutation. `open-pr`
+  never asks for a subject for an existing PR, since it doesn't merge.
+
+## Output
 
 ```text
-/plugin install gitauto@ai-extension-collection
+DONE state=created|unchanged|nothing|failed ...        # nothing left for the model
+ship: [n] <stage> ... / -> <state>                      # progress, one pair per stage
+--- failure: verify|wait-ci ...                         # only on those failures
+SHIPPED pr=#N url=... sync=synced cleanup=clean ... tag=ask|declined|none|tagged ... log=<file>
+READY pr=#N url=... ci=green|none log=<file>            # open-pr: PR open, CI green, not merged
+TAGGED version=<v> latest=<v> log=<file>                # after an explicitly chosen tag
+PARTIAL ...                                             # merged, but sync/cleanup/tag incomplete
+WAITING stage=wait-ci pr=#N url=... log=<file>          # CI still running; re-run to resume
+STOPPED stage=<stage> state=<state> report=<why> log=<file>
 ```
 
-Claude Code auto-discovers both `commands/` and `workflows/`, and substitutes
-`${CLAUDE_PLUGIN_ROOT}` in command markdown with the installed plugin directory,
-so the helpers are invoked from the plugin's own `scripts/`.
+The full helper output goes to the log file, not into the model's context.
 
-## Pi
+## Safety
 
-Pi is not wired up yet. Its `pi-claude-marketplace` bridge handles `agents/`,
-`commands/`, `hooks/`, `mcp`, and `skills/` — there is no `workflows/` bridge, so
-a plugin-shipped workflow is currently Claude Code only.
+`scripts/gitauto-*.sh` are self-contained guarded helpers, each with its own
+test. Every guard applies:
 
-The workflow script itself remains Pi-compatible: it falls back to
-`$HOME/.pi/workflows/saved` when no `root` argument is supplied, which is where
-the upstream `pi-code-config` Makefile installs the helpers. Wiring Pi to load
-them from the plugin is still an open task.
+- `main`, `master`, and the resolved default branch are protected; detached
+  HEAD and an unresolvable `origin` default are refused. Every mutating helper
+  re-checks the guard right before it acts.
+- Verification (Make `verify`, then `test`/`lint`/`vet`/`check`, npm scripts,
+  Go checks, or Maven `verify` via `./mvnw` or `mvn`) must pass or skip before
+  anything is committed.
+- The merge needs a valid Conventional Commit subject, a matching PR head, and
+  checks that are green or explicitly absent.
+- Sync fast-forwards only and refuses a dirty primary worktree. Cleanup keeps
+  the local branch and deletes the remote branch only with `deleteRemote=true`.
+  Tagging happens only with an explicit `tag=<semver>` or an explicit answer to
+  the tag question.
+- **Merged-PR guard:** new work on a branch whose PR is already merged is never
+  skipped past. `prepare` refuses a dirty tree, and `run` stops unless `HEAD` is
+  exactly the merged PR's head commit.
 
-## Requirements
-
-- `bash` and `git` for every command.
-- The GitHub CLI `gh`, authenticated, for `open-pr`, `wait-ci`, and `merge`
-  (and, as a fallback, for default-branch resolution).
-- A `tag` target in the repository's `Makefile`, `makefile`, or `GNUmakefile`
-  for the `tag` stage. Without it, tagging is blocked.
-- `verify` uses whatever the repository declares: Make targets, package scripts,
-  or Go module checks. It skips cleanly when it finds none.
+`ship` stages everything (`git add -A`), including unrelated changes in the
+working tree. Check `git status` first.
 
 ## Tests
-
-The helpers have their own test suite. Each test builds throwaway Git fixtures
-in `$TMPDIR` and never touches the surrounding repository:
 
 ```sh
 bash plugins/gitauto/scripts/run-tests.sh
 ```
 
-It runs every `scripts/*.test.sh` file and fails if any of them fails.
+This runs `branch-out.test.sh`, `ship.test.sh` (a local bare remote plus a fake
+`gh`, end to end), and the helper tests.
