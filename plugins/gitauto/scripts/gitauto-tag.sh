@@ -81,5 +81,9 @@ if [[ "$vmajor" -lt "$major" ]] || { [[ "$vmajor" -eq "$major" ]] && [[ "$vminor
   exit 2
 fi
 
-make -C "$worktree" tag VERSION="$version" >&2
+# Pass both spellings: repos read either `make tag version=...` or `VERSION=...`.
+if ! make -C "$worktree" tag version="$version" VERSION="$version" >&2; then
+  printf 'state=failed\nversion=%s\nlatest=%s\nreport=make tag failed\n' "$version" "$latest"
+  exit 1
+fi
 printf 'state=tagged\nversion=%s\nlatest=%s\nreport=release tag target completed\n' "$version" "$latest"

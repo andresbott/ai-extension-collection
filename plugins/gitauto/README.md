@@ -143,7 +143,8 @@ Each extra round is one short tool call.
 `ship` never creates a tag unless you explicitly choose one.
 
 - With `tag=<semver>` in the arguments, it tags straight away through `make tag`,
-  without asking.
+without asking. The version is passed as both `version=<v>` and `VERSION=<v>`,
+so the target can read either spelling.
 - With `no tag` (in any wording), it doesn't ask; the result shows `tag=declined`.
 - Otherwise, if the repo has a `make tag` target, `run` only *recommends*. It
   ends with `tag=ask tag_recommended=<v> tag_options=<recommended>,<others>
