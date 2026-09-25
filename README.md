@@ -5,17 +5,13 @@ for reusable extensions.
 
 ## Available plugins
 
-- **`architects`** — provides specialist agents for Go, Vue and TypeScript,
-  OpenAPI, dependency layering, and project setup validation.
-- **`coding-guides`** — injects standing coding conventions and enforces selected
-  tool-use rules.
-- **`doc-authoring`** — helps create and maintain internal, agent-facing project
-  documentation.
-- **`gitauto`** — token-cheap, script-backed Git commands on haiku:
-  `branch-out`, `open-pr` (stop at green CI), and `ship` (with an opt-in tag
-  prompt); an Opus PR writer is used only for complex changes.
-- **`go-idioms`** — provides Effective Go and idiomatic Go guidance for writing,
-  reviewing, and refactoring Go code.
+| Plugin | Type | Provides | Description |
+| --- | --- | --- | --- |
+| `architects` | Agents | `pike-go`, `natalia-frontend`, `tony-openapi`, `evans-layering`, `margaret-setup` | Specialist agents for Go, Vue and TypeScript, OpenAPI, dependency layering, and project setup validation. |
+| `coding-guides` | Hooks | `SessionStart` context injection, `PreToolUse` guard | Injects standing coding conventions and enforces selected tool-use rules. |
+| `doc-authoring` | Skill | `agents-documentation` | Helps create and maintain internal, agent-facing project documentation. |
+| `gitauto` | Slash commands, Agent | `/branch-out`, `/open-pr`, `/ship`; `pr-writer` agent | Token-cheap, script-backed Git commands on haiku: `open-pr` stops at green CI, `ship` has an opt-in tag prompt; an Opus PR writer is used only for complex changes. |
+| `go-idioms` | Skills | `effective-go`, `golang-patterns` | Effective Go and idiomatic Go guidance for writing, reviewing, and refactoring Go code. |
 
 ## Add the marketplace
 
