@@ -2,10 +2,10 @@ export const meta = {
   name: 'flow-run',
   description: 'Internal gitauto delivery flow; launched by /gitauto:branch-out, /gitauto:open-pr, and /gitauto:ship',
   phases: [
-    { title: 'Prepare', detail: 'Branch, verify, commit, and push' },
-    { title: 'Publish', detail: 'Open the pull request and wait for CI' },
-    { title: 'Land', detail: 'Merge, synchronize main, and clean up' },
-    { title: 'Release', detail: 'Optionally publish an explicit release tag' },
+    { title: 'Prepare', detail: 'Branch, verify, commit, and push', model: 'haiku' },
+    { title: 'Publish', detail: 'Open the pull request and wait for CI', model: 'haiku' },
+    { title: 'Land', detail: 'Merge, synchronize main, and clean up', model: 'haiku' },
+    { title: 'Release', detail: 'Optionally publish an explicit release tag', model: 'haiku' },
   ],
 }
 
@@ -23,6 +23,9 @@ const root = str(args?.root) || '$HOME/.pi/workflows/saved'
 const helper = name => `bash "${root}/gitauto-${name}.sh"`
 const remote = str(args?.remote) || 'origin'
 const base = str(args?.base)
+// Every stage is a narrow helper invocation, so a cheap model is enough.
+const model = str(args?.model) || 'haiku'
+const ask = (prompt, opts = {}) => agent(prompt, { model, ...opts })
 
 const withStatus = (result, empty, map = {}) => {
   if (result === null) return { status: 'incomplete', ...empty }
@@ -31,45 +34,70 @@ const withStatus = (result, empty, map = {}) => {
 
 // ---------------------------------------------------------------- stages
 
-const branchStage = async requestedName => {
-  const command = requestedName ? `${helper('branch')} ${shellQuote(requestedName)}` : helper('branch')
-  const result = await agent(
+const BRANCH_CANDIDATES = 5
+const BRANCH_ROUNDS = 3
+const branchSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['state', 'branch', 'nameSource', 'candidates', 'report'],
+  properties: {
+    state: { type: 'string', enum: ['created', 'unchanged', 'exists', 'failed'] },
+    branch: { type: ['string', 'null'] },
+    nameSource: { type: 'string', enum: ['provided', 'changes', 'invented', 'existing'] },
+    candidates: { type: 'array', items: { type: 'string' } },
+    report: { type: 'string' },
+  },
+}
+
+const branchAttempt = async (requestedName, excluded, round) => {
+  const task = requestedName
+    ? `A branch name was requested: ${JSON.stringify(requestedName)}. Run exactly:
+${helper('branch')} ${shellQuote(requestedName)}
+Do not alter the supplied name. Report candidates=[${JSON.stringify(requestedName)}] and nameSource=provided.`
+    : `No branch name was requested.
+1. Determine the current branch. If it is not main or master, run ${helper('branch')} without arguments; it reports unchanged. Use nameSource=existing.
+2. Otherwise inspect the uncommitted changes with read-only git commands (git status, git diff --stat).
+3. In a single step, invent exactly ${BRANCH_CANDIDATES} distinct, concise, lowercase branch names such as feat/<slug>, fix/<slug>, docs/<slug>, or chore/<slug>. When the changes make the purpose clear, base them on the changes (nameSource=changes). When there are no changes or they suggest nothing useful, invent varied, random-sounding names such as work/<adjective>-<noun> (nameSource=invented). Never use generic names like work/change.${excluded.length ? `
+4. These names are already taken; do not reuse any of them: ${JSON.stringify(excluded)}` : ''}
+Then run the helper once with all ${BRANCH_CANDIDATES} names as separately shell-quoted arguments, in your preferred order:
+${helper('branch')} '<name1>' '<name2>' ... '<name${BRANCH_CANDIDATES}>'
+The helper tries them in order and checks out the first one that does not already exist. Report every name you passed in candidates.`
+  return ask(
     `Operate on the current Git repository and do only the branch task below.
 
-Requested branch name: ${JSON.stringify(requestedName || null)}
-Branch helper command: ${command}
+${task}
 
 Rules:
-1. Determine the current branch. If it is not main or master, run the helper without inventing or creating another branch and report unchanged.
-2. If a branch name was requested, run the exact helper command above. Do not alter the supplied name.
-3. If no name was requested and the current branch is main or master, inspect the uncommitted changes with read-only git commands. Choose a concise lowercase branch name such as feat/<slug>, fix/<slug>, docs/<slug>, or chore/<slug> when the changes make the purpose clear.
-4. If the changes do not suggest a useful name, run the helper without an argument; it provides deterministic file-based and invented fallbacks.
-5. Do not stage, commit, push, reset, or modify files. Run the helper at most once.
-6. Return the real outcome through the structured output tool. Use state=failed if the helper fails, and explain the error in report.`,
-    {
-      label: 'create-branch',
-      schema: {
-        type: 'object',
-        additionalProperties: false,
-        required: ['state', 'branch', 'nameSource', 'report'],
-        properties: {
-          state: { type: 'string', enum: ['created', 'unchanged', 'failed'] },
-          branch: { type: ['string', 'null'] },
-          nameSource: { type: 'string', enum: ['provided', 'changes', 'invented', 'existing'] },
-          report: { type: 'string' },
-        },
-      },
-    },
+- Do not stage, commit, push, reset, create branches yourself, or modify files. Run the helper at most once.
+- The helper prints key=value lines. Map them to structured output: state=created → created, state=unchanged → unchanged, state=exists (exit 3, every candidate already taken) → exists, anything else or a non-zero exit → failed with the error in report.
+- Return the real outcome through the structured output tool.`,
+    { label: `create-branch${round > 1 ? `-retry-${round - 1}` : ''}`, schema: branchSchema },
   )
+}
+
+const branchStage = async requestedName => {
+  const excluded = []
+  let result = null
+  const rounds = requestedName ? 1 : BRANCH_ROUNDS
+  for (let round = 1; round <= rounds; round++) {
+    result = await branchAttempt(requestedName, excluded, round)
+    if (!result || result.state !== 'exists') break
+    excluded.push(...result.candidates)
+    log(`branch candidates already exist (${result.candidates.join(', ')}); ${round < rounds ? 'asking for new names' : 'giving up'}`)
+  }
+  if (result?.state === 'exists') {
+    result = { ...result, report: `${result.report} (every candidate across ${rounds} round(s) already exists: ${excluded.join(', ')})` }
+  }
   return withStatus(result, {
     branch: null,
     nameSource: null,
+    candidates: [],
     report: 'The branch operator did not return a result; repository state is unknown.',
-  }, { failed: 'failed' })
+  }, { failed: 'failed', exists: 'failed' })
 }
 
 const verifyStage = async () => {
-  const result = await agent(
+  const result = await ask(
     `Operate on the current Git repository and perform only verification.
 
 Verification helper command: ${helper('verify')}
@@ -103,7 +131,7 @@ Rules:
 
 const commitStage = async requestedMessage => {
   const command = requestedMessage ? `${helper('commit')} ${shellQuote(`message=${requestedMessage}`)}` : null
-  const result = await agent(
+  const result = await ask(
     `Operate on the current Git repository and perform only the commit task below.
 
 Requested commit message: ${JSON.stringify(requestedMessage || null)}
@@ -141,7 +169,7 @@ Rules:
 
 const pushStage = async () => {
   const command = `${helper('push')} ${shellQuote(`remote=${remote}`)}`
-  const result = await agent(`Run only this guarded push command in the current repository:
+  const result = await ask(`Run only this guarded push command in the current repository:
 ${command}
 
 Do not run git push directly, alter branches, commit, reset, merge, or edit files. Return the helper's real outcome through the structured output tool.`, {
@@ -168,7 +196,7 @@ const openPrStage = async (title, body) => {
   const instruction = title && body
     ? `Run this exact guarded helper command once:\n${helper('open-pr')} ${shellQuote(`title=${title}`)} ${shellQuote(`body=${body}`)}${baseArgument}`
     : `No complete title/body was supplied. First use read-only git log and git diff commands to understand the branch against ${JSON.stringify(base || 'the default branch')}. Write a concise one-line title${title ? ` (use exactly ${JSON.stringify(title)})` : ''} and a compact body containing ## Summary and ## What, with ## Notes only when useful${body ? ` (use exactly the supplied body: ${JSON.stringify(body)})` : ''}. Then invoke ${helper('open-pr')} exactly once with separately shell-quoted title=<title>, body=<body>, and ${baseInstruction}.`
-  const result = await agent(`Open or reuse the current feature branch's pull request.
+  const result = await ask(`Open or reuse the current feature branch's pull request.
 
 ${instruction}
 
@@ -193,7 +221,7 @@ Do not commit, push, merge, reset, branch, or edit files. Return the helper's re
 
 const waitCiStage = async pr => {
   const command = pr ? `${helper('wait-ci')} ${shellQuote(`pr=${pr}`)}` : helper('wait-ci')
-  const result = await agent(`Run this exact CI-wait helper command once:\n${command}\n\nDo not create, update, or merge a pull request. Do not modify Git state or files. Return the helper's real terminal state through structured output.`, {
+  const result = await ask(`Run this exact CI-wait helper command once:\n${command}\n\nDo not create, update, or merge a pull request. Do not modify Git state or files. Return the helper's real terminal state through structured output.`, {
     label: 'wait-for-ci',
     schema: {
       type: 'object',
@@ -215,7 +243,7 @@ const mergeStage = async (pr, subject) => {
   const instruction = subject
     ? `Run this exact guarded merge helper once:\n${helper('merge')}${prArg} ${shellQuote(`subject=${subject}`)}`
     : `Use read-only gh pr view and git log commands to identify the current branch's PR and derive a concise valid Conventional Commit subject from its title and commits. Then run ${helper('merge')}${prArg} once with a separately shell-quoted subject=<subject> argument.`
-  const result = await agent(`${instruction}\n\nDo not wait for CI, delete branches, synchronize main, remove worktrees, tag, push, commit, or edit files. Return the helper's real outcome.`, {
+  const result = await ask(`${instruction}\n\nDo not wait for CI, delete branches, synchronize main, remove worktrees, tag, push, commit, or edit files. Return the helper's real outcome.`, {
     label: 'merge-pull-request',
     schema: {
       type: 'object',
@@ -237,7 +265,7 @@ const mergeStage = async (pr, subject) => {
 const syncMainStage = async () => {
   const mainArg = base ? ` ${shellQuote(`main=${base}`)}` : ''
   const command = `${helper('sync-main')} ${shellQuote(`remote=${remote}`)}${mainArg}`
-  const result = await agent(`Run this exact default-branch synchronization helper once:\n${command}\n\nDo not merge a PR, push, remove worktrees, delete branches, tag, commit, or edit files. Return its real outcome.`, {
+  const result = await ask(`Run this exact default-branch synchronization helper once:\n${command}\n\nDo not merge a PR, push, remove worktrees, delete branches, tag, commit, or edit files. Return its real outcome.`, {
     label: 'sync-default-branch',
     schema: {
       type: 'object',
@@ -259,7 +287,7 @@ const syncMainStage = async () => {
 const cleanupStage = async (branch, deleteRemote) => {
   const branchArg = branch ? ` ${shellQuote(`branch=${branch}`)}` : ''
   const command = `${helper('cleanup')}${branchArg} ${shellQuote(`remote=${remote}`)} ${shellQuote(`deleteRemote=${deleteRemote}`)}`
-  const result = await agent(`Run this exact guarded cleanup helper once:\n${command}\n\nDo not delete any local branch, force-remove a worktree, merge, tag, commit, or edit files. Return every helper sub-outcome accurately.`, {
+  const result = await ask(`Run this exact guarded cleanup helper once:\n${command}\n\nDo not delete any local branch, force-remove a worktree, merge, tag, commit, or edit files. Return every helper sub-outcome accurately.`, {
     label: 'cleanup-feature-branch',
     schema: {
       type: 'object',
@@ -281,7 +309,7 @@ const cleanupStage = async (branch, deleteRemote) => {
 const tagStage = async (version, subject, worktree) => {
   const subjectArg = subject ? ` ${shellQuote(`subject=${subject}`)}` : ''
   const command = `${helper('tag')} ${shellQuote(`version=${version}`)}${subjectArg} ${shellQuote(`remote=${remote}`)} ${shellQuote(`worktree=${worktree || '.'}`)}`
-  const result = await agent(`Run this exact guarded release helper once:\n${command}\n\nThe explicit version authorizes the repository's make tag target, which may publish. Do not invent a version beyond the helper's result, and do not run git tag or git push directly.`, {
+  const result = await ask(`Run this exact guarded release helper once:\n${command}\n\nThe explicit version authorizes the repository's make tag target, which may publish. Do not invent a version beyond the helper's result, and do not run git tag or git push directly.`, {
     label: 'release-tag',
     schema: {
       type: 'object',
@@ -372,7 +400,7 @@ return {
   until,
   stoppedAt: null,
   stages,
-  report: (await agent(`Summarize this gitauto ship stage ledger in under 120 words. Preserve failures, warnings, PR numbers, merge state, cleanup state, and tag state exactly; invent nothing. Do not suggest or ask about creating a release tag:\n${JSON.stringify(stages)}`, {
+  report: (await ask(`Summarize this gitauto ship stage ledger in under 120 words. Preserve failures, warnings, PR numbers, merge state, cleanup state, and tag state exactly; invent nothing. Do not suggest or ask about creating a release tag:\n${JSON.stringify(stages)}`, {
     label: 'summarize-ship',
   })) || 'Ship flow completed; see stage ledger.',
 }

@@ -34,7 +34,7 @@ GH
 
 new_trunk_fixture
 printf 'change\n' >> "$repo/README.md"
-output="$( (cd "$repo" && "$SCRIPT_DIR/gitauto-branch.sh") 2>&1)" || fail "branch helper failed: $output"
+output="$( (cd "$repo" && "$SCRIPT_DIR/gitauto-branch.sh" feat/leave-trunk) 2>&1)" || fail "branch helper failed: $output"
 [[ "$(git -C "$repo" branch --show-current)" != trunk ]] || fail "branch helper left work on custom default trunk: $output"
 printf 'PASS: branch helper leaves a custom default branch\n'
 

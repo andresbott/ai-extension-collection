@@ -11,6 +11,6 @@ and `args` set to this exact JSON object:
 ```
 
 If `$ARGUMENTS` names a branch, add `"branch"` set to it; otherwise the flow
-infers a name from the uncommitted changes. Never drop `root` or `until`.
+proposes candidate names and checks out the first free one. Never drop `root` or `until`.
 
 Wait for the workflow to finish, then report its result verbatim.

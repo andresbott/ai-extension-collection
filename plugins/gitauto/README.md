@@ -20,9 +20,12 @@ create tag`) skips tagging and the command never asks about a tag.
 
 ## Stages
 
+Every stage agent runs on `haiku` by default; pass `"model"` in the workflow
+args to override it.
+
 | Stage | Behaviour |
 |---|---|
-| `branch` | On `main`/`master`, creates and checks out a feature branch; an explicit name wins, otherwise a name is inferred from the uncommitted changes, with deterministic file-based and invented fallbacks. Existing feature branches are left unchanged. |
+| `branch` | On `main`/`master`, creates and checks out a feature branch; an explicit name wins, otherwise the model proposes 5 candidate names in one shot (from the uncommitted changes, or invented when there are none) and the helper checks out the first that does not already exist locally or on `origin`; if all are taken it asks for 5 new names, up to 3 rounds. Existing feature branches are left unchanged. |
 | `verify` | Prefers a `verify` Make target, then declared `test`, `lint`, `vet`, and `check` targets, then package scripts or standard Go module checks. Stops on the first failure and returns `pass`, `fail`, or `skip`. |
 | `commit` | On a feature branch, stages everything and creates exactly one commit with a one-line message (supplied verbatim, or composed from the diff). No body, no `Co-Authored-By`. Clean trees are unchanged; `main`, `master`, and detached HEAD are blocked before staging. |
 | `push` | Pushes the current feature branch and configures its upstream, re-checking the protected-branch guard immediately before pushing. Defaults to `origin`. |
