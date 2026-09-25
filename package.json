@@ -1,13 +1,13 @@
 {
   "name": "ai-extension-collection",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "description": "Pi package for the ai-extension-collection plugins that ship a pi adapter, pi-only extension, pi agents (plugins/<name>/pi/), or Agent Skills (plugins/<name>/skills/).",
   "type": "module",
   "keywords": ["pi-package"],
   "scripts": {
     "test": "bash plugins/gitauto/scripts/run-tests.sh && bash plugins/coding-guides/hooks/coding-guides-pre-tool-use.test.sh && npm run test:pi",
-    "test:pi": "node --test plugins/*/pi/*.test.ts"
+    "test:pi": "node --test plugins/*/pi/*.test.ts libs/*/*.test.ts"
   },
   "pi": {
     "extensions": [
@@ -18,7 +18,8 @@
       "./plugins/pi-context/pi/index.ts",
       "./plugins/pi-rename/pi/index.ts",
       "./plugins/pi-startup-splash/pi/index.ts",
-      "./plugins/pi-statusline/pi/index.ts"
+      "./plugins/pi-statusline/pi/index.ts",
+      "./plugins/pi-summarize/pi/index.ts"
     ],
     "skills": [
       "./plugins/doc-authoring/skills",

@@ -21,7 +21,7 @@ const conversation = [
   { type: "message", message: { role: "assistant", content: [{ type: "text", text: "Done." }] } },
 ];
 
-function makeCtx({ entries = conversation, reply, auth = true, model = { name: "m" }, fail } = {}) {
+function makeCtx({ entries = conversation, reply, auth = true, model = { provider: "p", id: "m" }, available = [], fail } = {}) {
   const notes = [];
   const calls = [];
   const ctx = {
@@ -29,6 +29,7 @@ function makeCtx({ entries = conversation, reply, auth = true, model = { name: "
     signal: undefined,
     sessionManager: { getBranch: () => entries },
     modelRegistry: {
+      getAvailable: () => available,
       hasConfiguredAuth: () => auth,
       streamSimple: (m, context, options) => {
         calls.push({ model: m, context, options });
@@ -65,10 +66,10 @@ test('/rename "title" sets the title verbatim without calling a model', async ()
   assert.match(notes.at(-1).message, /Session named: My exact Title\./);
 });
 
-test("bare /rename asks the current model and applies the cleaned name", async () => {
+test("bare /rename falls back to the session model when no Sonnet is available", async () => {
   const { pi, commands, names } = makeFakePi();
   piRename(pi);
-  const { ctx, calls, notes } = makeCtx();
+  const { ctx, calls, notes } = makeCtx({ available: [{ provider: "p", id: "gpt-5.4-mini" }] });
 
   await commands.get("rename").handler("", ctx);
 
@@ -80,6 +81,37 @@ test("bare /rename asks the current model and applies the cleaned name", async (
   const prompt = calls[0].context.messages[0].content[0].text;
   assert.match(prompt, /User: add a \/rename command to pi/);
   assert.match(notes.at(-1).message, /Session named: Add Rename Command/);
+});
+
+test("bare /rename names with the newest Sonnet, preferring the session's provider", async () => {
+  const { pi, commands, names } = makeFakePi();
+  piRename(pi);
+  const copilotSonnet = { provider: "github-copilot", id: "claude-sonnet-4.6" };
+  const available = [
+    { provider: "anthropic", id: "claude-sonnet-5" },
+    { provider: "github-copilot", id: "claude-opus-5" },
+    copilotSonnet,
+  ];
+  const { ctx, calls, notes } = makeCtx({ model: { provider: "github-copilot", id: "claude-opus-5" }, available });
+
+  await commands.get("rename").handler("", ctx);
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].model, copilotSonnet);
+  assert.ok(notes.some((n) => n.message.includes("claude-sonnet-4.6")), "tells the user which model names it");
+  assert.deepEqual(names, ["Add Rename Command"]);
+});
+
+test("bare /rename uses a Sonnet even when the session has no model", async () => {
+  const { pi, commands, names } = makeFakePi();
+  piRename(pi);
+  const sonnet = { provider: "anthropic", id: "claude-sonnet-5" };
+  const { ctx, calls } = makeCtx({ model: null, available: [sonnet] });
+
+  await commands.get("rename").handler("", ctx);
+
+  assert.equal(calls[0].model, sonnet);
+  assert.deepEqual(names, ["Add Rename Command"]);
 });
 
 test("bare /rename on an empty session warns and names nothing", async () => {

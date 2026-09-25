@@ -83,6 +83,25 @@ pi -e ./plugins/<plugin-name>/pi/index.ts
 
 or the whole package with `pi -e .`. Use `/reload` after editing.
 
+## Share code between pi extensions
+
+Mechanism that several pi extensions need, with no domain knowledge (picking a
+model, building a transcript, making a side call), goes in `libs/<name>/`, not
+in one plugin that the others import from:
+
+- Plugins import it by relative path
+  (`../../../libs/pi-side-call/models.ts`). pi installs the whole repository,
+  so the path resolves.
+- A lib never imports from `plugins/`. It keeps zero runtime dependencies and
+  reads pi objects through small structural types instead of importing pi's.
+  The caller injects the policy, for example which model families to prefer.
+- Put its tests next to it as `libs/<name>/*.test.ts`; `npm run test:pi` runs
+  them.
+- A lib is part of the pi package, so changing it bumps the root
+  `package.json` version.
+- Only pi adapters may import a lib. Claude Code installs each plugin
+  directory on its own, so Claude-side files cannot reach `libs/`.
+
 ## Develop locally
 
 Load a plugin directly while iterating:
@@ -111,6 +130,7 @@ and reload plugins after changing an installed plugin:
 
 Every commit must increase the version in `.claude-plugin/marketplace.json`.
 Commits that change a Claude plugin must also increase that plugin's own manifest
-version. Commits that change a pi adapter (`plugins/*/pi/`), a pi-only plugin, or
-the root `package.json` must also increase the root `package.json` version. Pull requests
+version. Commits that change a pi adapter (`plugins/*/pi/`), a pi-only plugin, a shared
+lib (`libs/`), or the root `package.json` must also increase the root
+`package.json` version. Pull requests
 enforce this policy through `.github/workflows/version-bump.yml`.

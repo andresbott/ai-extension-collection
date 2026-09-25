@@ -110,11 +110,11 @@ jobs:
             fi
           done
 
-          # The pi package: a changed pi adapter, pi-only plugin, or
-          # package.json needs a bump.
+          # The pi package: a changed pi adapter, pi-only plugin, shared lib,
+          # or package.json needs a bump.
           if [ "$pi_only_changed" -eq 1 ] \
             || git diff --name-only "$BASE_SHA" "$HEAD_SHA" \
-              | grep -qE '^(package\.json$|plugins/[^/]+/pi/)'
+              | grep -qE '^(package\.json$|plugins/[^/]+/pi/|libs/)'
           then
             base_pi_version="$(version_at "$BASE_SHA" package.json)"
             head_pi_version="$(version_at "$HEAD_SHA" package.json)"

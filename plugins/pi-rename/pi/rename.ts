@@ -1,17 +1,14 @@
 // Pure helpers behind the /rename command. No dependencies; fully unit-tested.
 //
 // /rename "Some title"  -> parseManualTitle() returns the title verbatim
-// /rename               -> buildTranscript() + buildNamingPrompt() feed one LLM
-//                          call, and cleanGeneratedName() tidies its reply.
+// /rename               -> buildTranscript() (libs/pi-side-call) + buildNamingPrompt()
+//                          feed one side call, and cleanGeneratedName() tidies its reply.
 
-/** The slice of a Pi session entry that the transcript builder reads. */
-export interface EntryLike {
-  type: string;
-  message?: { role?: string; content?: unknown };
-}
+/** Transcript budget, in characters, sent to the naming model. */
+export const TRANSCRIPT_CHARS = 6000;
 
-/** Default transcript budget, in characters, sent to the naming model. */
-export const DEFAULT_TRANSCRIPT_CHARS = 6000;
+/** Model families for naming, most preferred first; the session model is the fallback. */
+export const NAMING_MODELS: readonly RegExp[] = [/sonnet/i];
 
 /** Upper bound on a generated session name. */
 export const MAX_NAME_CHARS = 80;
@@ -42,44 +39,6 @@ export function parseManualTitle(args: string | undefined): string | undefined {
   if (!trimmed) return undefined;
   const title = stripWrappingQuotes(trimmed).trim();
   return title || undefined;
-}
-
-function textOf(content: unknown): string {
-  if (typeof content === "string") return content;
-  if (!Array.isArray(content)) return "";
-  return content
-    .filter(
-      (part): part is { type: "text"; text: string } =>
-        !!part && typeof part === "object" && part.type === "text" && typeof part.text === "string",
-    )
-    .map((part) => part.text)
-    .join("\n");
-}
-
-/**
- * Flattens the user and assistant text of a session branch into a plain
- * transcript. Tool calls, tool results, and other entries are skipped. When the
- * transcript exceeds maxChars it keeps the start (where the goal usually is) and
- * the end (where the conversation is now), dropping the middle.
- */
-export function buildTranscript(
-  entries: readonly EntryLike[],
-  maxChars: number = DEFAULT_TRANSCRIPT_CHARS,
-): string {
-  const sections: string[] = [];
-  for (const entry of entries) {
-    const role = entry.type === "message" ? entry.message?.role : undefined;
-    if (role !== "user" && role !== "assistant") continue;
-    const text = textOf(entry.message?.content).trim();
-    if (text) sections.push(`${role === "user" ? "User" : "Assistant"}: ${text}`);
-  }
-
-  const transcript = sections.join("\n\n");
-  if (transcript.length <= maxChars) return transcript;
-
-  const marker = "\n\n[…]\n\n";
-  const half = Math.max(0, Math.floor((maxChars - marker.length) / 2));
-  return transcript.slice(0, half) + marker + transcript.slice(transcript.length - half);
 }
 
 /** The single-turn prompt asking the model for a session name. */
