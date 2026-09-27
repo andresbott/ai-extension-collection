@@ -19,7 +19,7 @@ if [[ -z "$branch" ]] || gitauto_remote_default_unresolved origin || gitauto_is_
   exit 0
 fi
 
-if ! command -v gh >/dev/null 2>&1 || ! gh auth status >/dev/null 2>&1; then
+if ! gitauto_gh_authenticated origin; then
   printf 'state=failed\nnumber=\nurl=\nbranch=%s\nreport=GitHub CLI is unavailable or unauthenticated\n' "$branch"
   exit 2
 fi

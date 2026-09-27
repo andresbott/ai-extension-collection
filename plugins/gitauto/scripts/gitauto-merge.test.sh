@@ -81,13 +81,13 @@ set -e
 ! grep -q '^pr merge ' "$log" || fail "invalid subject attempted merge"
 printf 'PASS: invalid subject is rejected before merge\n'
 
-for checks in failed pending; do
+for checks in failed:blocked pending:pending; do
   new_fixture feat/merge
-  output="$( (cd "$repo" && PATH="$bin:$PATH" GH_LOG="$log" GH_SCENARIO=open GH_CHECKS="$checks" "$MERGE_SCRIPT" 'pr=42' 'subject=feat: add feature') 2>&1)" || fail "$checks checks should block safely: $output"
-  [[ "$output" == *'state=blocked'* ]] || fail "$checks checks did not block merge: $output"
-  ! grep -q '^pr merge ' "$log" || fail "$checks checks reached merge"
+  output="$( (cd "$repo" && PATH="$bin:$PATH" GH_LOG="$log" GH_SCENARIO=open GH_CHECKS="${checks%%:*}" "$MERGE_SCRIPT" 'pr=42' 'subject=feat: add feature') 2>&1)" || fail "${checks%%:*} checks should stop safely: $output"
+  [[ "$output" == *"state=${checks#*:}"* ]] || fail "${checks%%:*} checks did not report state=${checks#*:}: $output"
+  ! grep -q '^pr merge ' "$log" || fail "${checks%%:*} checks reached merge"
 done
-printf 'PASS: failed and pending checks block standalone merge\n'
+printf 'PASS: failed checks block and pending checks report pending, neither merges\n'
 
 new_fixture feat/merge
 output="$( (cd "$repo" && PATH="$bin:$PATH" GH_LOG="$log" GH_SCENARIO=open GH_CHECKS=none "$MERGE_SCRIPT" 'pr=42' 'subject=feat: add feature') 2>&1)" || fail "no-checks merge failed: $output"

@@ -26,6 +26,10 @@ case "${1:-} ${2:-}" in
       failed) printf 'unit test failed\n' >&2; exit 1 ;;
       none) printf 'no checks reported on the branch\n' >&2; exit 1 ;;
       pending) printf 'checks still pending\n' >&2; exit 8 ;;
+      # Checks register only on the third ask, like a pull_request workflow on a new PR.
+      late)
+        (( $(grep -c '^pr checks' "$GH_LOG") >= 3 )) || { printf 'no checks reported on the branch\n' >&2; exit 1; }
+        printf 'checks passed\n' ;;
     esac
     ;;
   *) printf 'unexpected gh command: %s\n' "$*" >&2; exit 9 ;;
@@ -47,12 +51,20 @@ status=$?
 set -e
 [[ $status -ne 0 && "$output" == *'state=failed'* ]] || fail "failed checks were not preserved: status=$status output=$output"
 ! grep -q 'pr merge' "$log" || fail "failed CI attempted a merge"
+[[ "$(grep -c '^pr checks' "$log")" -eq 1 ]] || fail "failed checks were asked for again"
 printf 'PASS: failed checks return failure without merging\n'
 
 : > "$log"
-output="$( (cd "$repo" && PATH="$bin:$PATH" GH_LOG="$log" GH_SCENARIO=none "$WAIT_SCRIPT" '42') 2>&1)" || fail "no-checks case should return safely: $output"
+output="$( (cd "$repo" && PATH="$bin:$PATH" GH_LOG="$log" GH_SCENARIO=none GITAUTO_CHECKS_GRACE=2 GITAUTO_CHECKS_GRACE_INTERVAL=1 "$WAIT_SCRIPT" '42') 2>&1)" || fail "no-checks case should return safely: $output"
 [[ "$output" == *'state=none'* ]] || fail "no-checks state missing: $output"
-printf 'PASS: absent checks are distinguished from failure\n'
+[[ "$(grep -c '^pr checks' "$log")" -ge 2 ]] || fail "no checks were not asked for again within the grace period"
+printf 'PASS: absent checks are distinguished from failure after a grace period\n'
+
+: > "$log"
+output="$( (cd "$repo" && PATH="$bin:$PATH" GH_LOG="$log" GH_SCENARIO=late GITAUTO_CHECKS_GRACE_INTERVAL=0 "$WAIT_SCRIPT" '42') 2>&1)" || fail "late checks failed: $output"
+[[ "$output" == *'state=green'* ]] || fail "checks that registered late were missed: $output"
+[[ "$(grep -c '^pr checks' "$log")" -eq 3 ]] || fail "late checks: expected 3 asks, got $(grep -c '^pr checks' "$log")"
+printf 'PASS: checks that register after the PR opens are waited for\n'
 
 : > "$log"
 output="$( (cd "$repo" && PATH="$bin:$PATH" GH_LOG="$log" GH_SCENARIO=pending "$WAIT_SCRIPT" '42') 2>&1)" || fail "pending checks should return a blocking state: $output"

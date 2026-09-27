@@ -55,6 +55,11 @@ checks="$(gh pr checks "$pr" 2>&1)"
 checks_status=$?
 set -e
 [[ -z "$checks" ]] || printf '%s\n' "$checks" >&2
+# gh exits 8 while checks are pending: not a failure, so the caller can wait again.
+if [[ $checks_status -eq 8 ]]; then
+  printf 'state=pending\nnumber=%s\nbranch=%s\nsubject=\nreport=CI checks are still pending\n' "$number" "$branch"
+  exit 0
+fi
 if [[ $checks_status -ne 0 ]] && ! printf '%s' "$checks" | grep -qiE 'no checks|no check runs'; then
   printf 'state=blocked\nnumber=%s\nbranch=%s\nsubject=\nreport=CI checks are not green\n' "$number" "$branch"
   exit 0

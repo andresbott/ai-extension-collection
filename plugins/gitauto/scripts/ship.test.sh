@@ -130,6 +130,16 @@ grep -q -- '--subject feat: slow (#7)' "$FAKE_GH/merge" || fail "resume merge su
 [[ "$(wc -l < "$MARK")" -eq 1 ]] || fail "verify ran $(wc -l < "$MARK") times"
 pass "slow CI hands back WAITING and a bare re-run resumes without re-verifying"
 
+fixture
+git -C "$repo" switch -qc feat/late
+printf 'late\n' >> "$repo/README.md"
+touch "$FAKE_GH/cilate"
+out="$(ship run --title 'feat: late check' --body-stdin <<<'body')"
+grep -q '^SHIPPED pr=#7 ' <<<"$out" || fail "late check: $out"
+[[ "$(grep -c '^ship: \[[0-9]*\] wait-ci -> green$' <<<"$out")" -eq 2 ]] || fail "late check should wait for CI twice: $out"
+grep -q '^ship: \[[0-9]*\] merge -> pending$' <<<"$out" || fail "merge should first see the late check pending: $out"
+pass "a check that registers after the CI wait is waited for before merging"
+
 tag_fixture() {
   fixture
   printf 'tag:\n\t@echo $(VERSION) > %s/tagged\n' "$root" > "$repo/Makefile"
@@ -227,6 +237,17 @@ out="$(ship run --title 'Fine title' --subject 'not conventional' --body-stdin <
 grep -q '^DONE state=failed report=--subject must be' <<<"$out" || fail "bad subject: $out"
 [[ -n "$(git -C "$repo" status --porcelain)" ]] || fail "nothing should be committed"
 pass "an invalid subject fails before any mutation"
+
+fixture
+cp "$TESTDATA/fake-ssh" "$bin/ssh"; chmod +x "$bin/ssh"
+git -C "$repo" remote set-url origin git@work-alias:o/r.git
+printf 'github.com' > "$FAKE_GH/auth-only"
+out="$(ship prepare '')"
+[[ "$out" == "DONE state=nothing branch=main report=nothing to ship" ]] || fail "broken login elsewhere blocked prepare: $out"
+printf 'git.corp.example' > "$FAKE_GH/auth-only"
+out="$(ship prepare '')"
+[[ "$out" == "DONE state=failed report=GitHub CLI is unavailable or unauthenticated" ]] || fail "origin host without a login passed: $out"
+pass "prepare checks gh auth for the origin host only"
 
 # prepare cuts the patch at GITAUTO_CMD_PATCH_LINES on purpose, and pipefail
 # must not turn the resulting SIGPIPE into a failed prepare: the command's ! line

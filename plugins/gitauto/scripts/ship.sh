@@ -70,7 +70,7 @@ prepare() {
   [[ -n "$current" ]] || fail "detached HEAD"
   git remote get-url origin >/dev/null 2>&1 || fail "no origin remote"
   gitauto_remote_default_unresolved origin && fail "default branch could not be resolved safely"
-  { command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; } || fail "GitHub CLI is unavailable or unauthenticated"
+  gitauto_gh_authenticated origin || fail "GitHub CLI is unavailable or unauthenticated"
   base="$(gitauto_resolve_default_branch origin)"
   rm -rf "$draft_dir"
 
@@ -313,27 +313,34 @@ run() {
       resolve_subject
       [[ -n "$subject" ]] || { st=needs-subject; stop merge "PR title is not a Conventional Commit and no subject is saved; re-run with --subject"; }
     fi
-    # Give CI only what is left of the run budget, so run fits one foreground call.
-    local budget=$((RUN_BUDGET - SECONDS)) tmo
-    (( budget >= CI_MIN )) || budget="$CI_MIN"
+    local budget tmo rounds=0
     tmo="$(command -v timeout || command -v gtimeout || true)"
-    if [[ -n "$tmo" ]]; then
-      step wait-ci "$tmo" "$budget" "$D/gitauto-wait-ci.sh" "pr=$number"
-    else
-      step wait-ci "$D/gitauto-wait-ci.sh" "pr=$number"
-    fi
-    if [[ -n "$tmo" && "$rc" -eq 124 ]] || [[ "$st" == pending ]]; then
-      printf 'ship: [%s] wait-ci -> still running after %ss\n' "$n" "$budget"
-      printf 'WAITING stage=wait-ci pr=#%s url=%s report=CI still running; re-run %s to resume log=%s\n' \
-        "$number" "$url" "$resume_cmd" "$log"
-      exit 3
-    fi
-    [[ "$st" == green || "$st" == none ]] || stop wait-ci
-    if [[ "$until" == pr ]]; then
-      printf 'READY pr=#%s url=%s ci=%s log=%s\n' "$number" "$url" "$st" "$log"
-      exit 0
-    fi
-    step merge "$D/gitauto-merge.sh" "pr=$number" "subject=$subject"
+    # A check can register after wait-ci saw the others finish (an Actions run
+    # queued behind a fast app check); merge then reports it pending, so wait again.
+    while :; do
+      # Give CI only what is left of the run budget, so run fits one foreground call.
+      budget=$((RUN_BUDGET - SECONDS))
+      (( budget >= CI_MIN )) || budget="$CI_MIN"
+      if [[ -n "$tmo" ]]; then
+        step wait-ci "$tmo" "$budget" "$D/gitauto-wait-ci.sh" "pr=$number"
+      else
+        step wait-ci "$D/gitauto-wait-ci.sh" "pr=$number"
+      fi
+      if [[ -n "$tmo" && "$rc" -eq 124 ]] || [[ "$st" == pending ]]; then
+        printf 'ship: [%s] wait-ci -> still running after %ss\n' "$n" "$budget"
+        printf 'WAITING stage=wait-ci pr=#%s url=%s report=CI still running; re-run %s to resume log=%s\n' \
+          "$number" "$url" "$resume_cmd" "$log"
+        exit 3
+      fi
+      [[ "$st" == green || "$st" == none ]] || stop wait-ci
+      if [[ "$until" == pr ]]; then
+        printf 'READY pr=#%s url=%s ci=%s log=%s\n' "$number" "$url" "$st" "$log"
+        exit 0
+      fi
+      step merge "$D/gitauto-merge.sh" "pr=$number" "subject=$subject"
+      rounds=$((rounds + 1))
+      [[ "$st" == pending && "$rounds" -lt 3 ]] || break
+    done
     [[ "$st" == merged || "$st" == already-merged ]] || stop merge
     merged=yes
   fi

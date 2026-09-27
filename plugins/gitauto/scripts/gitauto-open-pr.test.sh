@@ -24,7 +24,8 @@ new_fixture() {
 set -euo pipefail
 printf '%s %s\n' "${1:-}" "${2:-}" >> "$GH_LOG"
 case "${1:-} ${2:-}" in
-  'auth status') exit 0 ;;
+  # GH_AUTH_ONLY: the one host with a working login; a wider check fails.
+  'auth status') [[ -z "${GH_AUTH_ONLY:-}" || "$*" == "auth status --hostname $GH_AUTH_ONLY" ]] ;;
   'repo view') printf '%s\n' "${GH_BASE:-main}" ;;
   'pr view')
     case "${GH_SCENARIO:-none}" in
@@ -97,3 +98,16 @@ output="$( (cd "$repo" && PATH="$bin:$PATH" GH_LOG="$log" GH_SCENARIO=none EXPEC
 [[ "$output" == *'state=created'* && "$output" == *'number=77'* ]] || fail "created PR outcome missing: $output"
 grep -q '^pr create$' "$log" || fail "gh pr create was not called"
 printf 'PASS: missing PR is created with exact arguments\n'
+
+new_fixture feat/host
+cp "$SCRIPT_DIR/testdata/fake-ssh" "$bin/ssh"; chmod +x "$bin/ssh"
+git -C "$repo" remote add origin git@work-alias:o/r.git
+git -C "$repo" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
+output="$( (cd "$repo" && PATH="$bin:$PATH" GH_LOG="$log" GH_AUTH_ONLY=github.com GH_SCENARIO=open "$OPEN_PR_SCRIPT") 2>&1)" || fail "a broken login on another host blocked the PR: $output"
+[[ "$output" == *'state=reused'* ]] || fail "origin host auth was not enough: $output"
+set +e
+output="$( (cd "$repo" && PATH="$bin:$PATH" GH_LOG="$log" GH_AUTH_ONLY=git.corp.example GH_SCENARIO=open "$OPEN_PR_SCRIPT") 2>&1)"
+status=$?
+set -e
+[[ $status -ne 0 && "$output" == *'report=GitHub CLI is unavailable or unauthenticated'* ]] || fail "origin host without a login passed: status=$status output=$output"
+printf 'PASS: gh auth is checked for the origin host only\n'

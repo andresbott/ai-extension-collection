@@ -2,7 +2,8 @@
 s="$FAKE_GH"; printf '%s\n' "$*" >> "$s/log"
 json=''; prev=''; for a in "$@"; do [[ "$prev" == --json ]] && json="$a"; prev="$a"; done
 case "${1:-} ${2:-}" in
-  'auth status') exit 0 ;;
+  # auth-only: the one host with a working login; a wider check fails.
+  'auth status') [[ ! -f "$s/auth-only" || "$*" == "auth status --hostname $(cat "$s/auth-only")" ]] ;;
   'repo view') exit 1 ;;
   'pr create')
     while [[ $# -gt 0 ]]; do case "$1" in --head) printf '%s' "$2" > "$s/head" ;; --title) printf '%s' "$2" > "$s/title" ;; --body) printf '%s' "$2" > "$s/body" ;; esac; shift; done
@@ -22,6 +23,8 @@ case "${1:-} ${2:-}" in
     esac ;;
   'pr checks')
     if [[ -f "$s/cislow" && -z "$json" ]]; then sleep 20; fi
+    # cilate: a check that registered after the watch ended; merge's check sees it pending once.
+    if [[ -f "$s/cilate" && "$*" != *--watch* ]]; then rm "$s/cilate"; printf 'lint\tpending\n'; exit 8; fi
     if [[ -f "$s/cifail" ]]; then
       if [[ -n "$json" ]]; then printf 'build\thttps://github.com/o/r/actions/runs/99/job/1\n'; exit 0; fi
       printf 'build\tfail\n'; exit 1

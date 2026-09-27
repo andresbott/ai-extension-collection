@@ -45,6 +45,45 @@ gitauto_is_protected_branch() {
   [[ -n "$default_branch" && "$branch" == "$default_branch" ]]
 }
 
+# The host a remote points at, as gh sees it: an SSH config alias (Host work with
+# HostName github.com) resolves to its real host through `ssh -G`, like gh does.
+# Fails for a local-path remote or a missing one.
+gitauto_remote_host() {
+  local url host ssh=no real
+  url="$(git remote get-url "${1:-origin}" 2>/dev/null)" || return 1
+  case "$url" in
+    *://*)
+      host="${url#*://}"
+      case "${url%%://*}" in *ssh*) ssh=yes ;; esac ;;
+    *:*)
+      # scp-like user@host:path; a slash before the first colon makes it a local path.
+      [[ "${url%%:*}" != */* ]] || return 1
+      host="${url%%:*}"; ssh=yes ;;
+    *) return 1 ;;
+  esac
+  host="${host%%/*}"; host="${host##*@}"; host="${host%%:*}"
+  [[ -n "$host" ]] || return 1
+  if [[ "$ssh" == yes ]] && command -v ssh >/dev/null 2>&1; then
+    real="$(ssh -G "$host" </dev/null 2>/dev/null | awk '$1 == "hostname" { print $2; exit }' || true)"
+    host="${real:-$host}"
+  fi
+  printf '%s\n' "$host"
+}
+
+# gh is installed and logged in to the remote's host. A bare `gh auth status`
+# checks every host gh knows, so a stale login on an unrelated host (another
+# GitHub Enterprise) would block this repo; it is only the fallback when the
+# remote's host is unknown.
+gitauto_gh_authenticated() {
+  local host
+  command -v gh >/dev/null 2>&1 || return 1
+  if host="$(gitauto_remote_host "${1:-origin}")"; then
+    gh auth status --hostname "$host" >/dev/null 2>&1
+  else
+    gh auth status >/dev/null 2>&1
+  fi
+}
+
 # The writing rules for each text a script needs from a model, printed as a
 # `--- write` block with one `<key>: <rule>` line per text. Every harness adapter
 # hands this block to its model unchanged, so the rules live only here.
