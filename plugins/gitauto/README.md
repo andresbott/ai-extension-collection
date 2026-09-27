@@ -100,8 +100,9 @@ TypeScript, so no model decides how to run it:
 /gitauto:ship  →  !`ship.sh prepare`  →  [pr-writer agent]  →  ship.sh run (foreground, resumable)
 ```
 
-1. **`prepare`** (preprocessing, no mutation) checks the guards and `gh` auth,
-   sizes the change against the default branch, and prints a `SHIP` line:
+1. **`prepare`** (preprocessing, no mutation) checks the guards and `gh` auth
+   for the origin's host only (SSH aliases resolved), so a stale login on an
+   unrelated host does not block the ship. It sizes the change against the default branch, and prints a `SHIP` line:
    `need=pr|message|none` says what text is missing, and `writer=cheap|expert`
    says who writes it. A `--- write` block lists each text to write, with its
    rule. For the cheap writer it appends status, commits,
@@ -124,6 +125,13 @@ finishes; you can still interrupt it. Claude Code caps a foreground Bash call at
 10 minutes, so `run` stays within a budget of `GITAUTO_CMD_RUN_BUDGET` seconds
 (default 540). The CI wait gets whatever time is left, and at least
 `GITAUTO_CMD_CI_MIN` seconds (default 30).
+
+A new PR has no checks until GitHub registers them (a `pull_request` workflow
+only starts once the PR exists), so the CI wait keeps asking for
+`GITAUTO_CHECKS_GRACE` seconds (default 60) before it treats the PR as having no
+CI; a repo without CI pays that wait once per ship. A check that registers
+after the wait has ended shows up as pending at merge time, and `run` then waits
+again, up to 3 rounds.
 
 If CI is still running when the budget runs out, `run` exits with
 `WAITING stage=wait-ci pr=#N ...`. The command then runs `ship.sh run` again

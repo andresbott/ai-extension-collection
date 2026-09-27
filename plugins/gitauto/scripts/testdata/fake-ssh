@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# `ssh -G <host>` for tests: work-alias is an SSH config alias for github.com;
+# any other host resolves to itself.
+[[ "${1:-}" == -G ]] || { printf 'fake ssh: unsupported %s\n' "$*" >&2; exit 9; }
+case "${2:-}" in
+  work-alias) printf 'host work-alias\nuser git\nhostname github.com\nport 22\n' ;;
+  *) printf 'host %s\nuser git\nhostname %s\nport 22\n' "${2:-}" "${2:-}" ;;
+esac
