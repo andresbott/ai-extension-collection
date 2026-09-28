@@ -26,11 +26,26 @@ if [[ ! "$pr" =~ ^[0-9]+$ ]]; then
   exit 0
 fi
 
-view="$(gh pr view "$pr" --json number,state,headRefName --jq '[.number,.state,.headRefName]|@tsv' 2>/dev/null || true)"
-if [[ -z "$view" ]]; then
-  printf 'state=blocked\nnumber=%s\nbranch=%s\nsubject=\nreport=pull request is missing\n' "$pr" "$branch"
-  exit 0
-fi
+# A flaky GitHub call must not read as a missing PR: retry it, and report gh's error.
+attempt=1
+while :; do
+  set +e
+  view="$(gh pr view "$pr" --json number,state,headRefName --jq '[.number,.state,.headRefName]|@tsv' 2>&1)"
+  view_status=$?
+  set -e
+  [[ $view_status -ne 0 ]] || break
+  printf '%s\n' "$view" >&2
+  if printf '%s' "$view" | grep -qiE 'could not resolve to a PullRequest'; then
+    printf 'state=blocked\nnumber=%s\nbranch=%s\nsubject=\nreport=pull request does not exist\n' "$pr" "$branch"
+    exit 0
+  fi
+  if (( attempt >= ${GITAUTO_GH_ATTEMPTS:-3} )); then
+    printf 'state=failed\nnumber=%s\nbranch=%s\nsubject=\nreport=pull request lookup failed: %s\n' "$pr" "$branch" "${view%%$'\n'*}"
+    exit 2
+  fi
+  attempt=$((attempt + 1))
+  sleep "${GITAUTO_GH_RETRY_DELAY:-5}"
+done
 IFS=$'\t' read -r number state head <<< "$view"
 if [[ "$state" == MERGED ]]; then
   printf 'state=already-merged\nnumber=%s\nbranch=%s\nsubject=\nreport=pull request was already merged\n' "$number" "$head"

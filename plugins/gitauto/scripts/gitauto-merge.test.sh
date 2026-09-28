@@ -24,7 +24,11 @@ case "${1:-} ${2:-}" in
       open) printf '42	OPEN	feat/merge\n' ;;
       merged) printf '42	MERGED	feat/merge\n' ;;
       closed) printf '42	CLOSED	feat/merge\n' ;;
-      missing) exit 1 ;;
+      missing) printf 'GraphQL: Could not resolve to a PullRequest with the number of 42. (repository.pullRequest)\n' >&2; exit 1 ;;
+      flaky)
+        [[ "$(grep -c '^pr view ' "$GH_LOG")" -gt 1 ]] || { printf 'HTTP 502: Bad Gateway (https://api.github.com/graphql)\n' >&2; exit 1; }
+        printf '42	OPEN	feat/merge\n' ;;
+      down) printf 'HTTP 502: Bad Gateway (https://api.github.com/graphql)\n' >&2; exit 1 ;;
     esac
     ;;
   'pr checks')
@@ -71,6 +75,23 @@ for scenario in closed missing; do
   ! grep -q '^pr merge ' "$log" || fail "$scenario PR attempted merge"
 done
 printf 'PASS: closed and missing PRs are blocked\n'
+
+new_fixture feat/merge
+output="$( (cd "$repo" && PATH="$bin:$PATH" GH_LOG="$log" GH_SCENARIO=flaky GITAUTO_GH_RETRY_DELAY=0 "$MERGE_SCRIPT" 'pr=42' 'subject=feat: add feature') 2>&1)" || fail "flaky lookup should recover: $output"
+[[ "$output" == *'state=merged'* ]] || fail "one failed PR lookup stopped the merge: $output"
+printf 'PASS: a transient PR lookup failure is retried\n'
+
+new_fixture feat/merge
+set +e
+output="$( (cd "$repo" && PATH="$bin:$PATH" GH_LOG="$log" GH_SCENARIO=down GITAUTO_GH_RETRY_DELAY=0 "$MERGE_SCRIPT" 'pr=42' 'subject=feat: add feature') 2>&1)"
+status=$?
+set -e
+[[ $status -ne 0 && "$output" == *'state=failed'* ]] || fail "persistent lookup failure was not a failure: status=$status output=$output"
+[[ "$output" == *'report=pull request lookup failed: HTTP 502: Bad Gateway'* ]] || fail "lookup failure hid the gh error: $output"
+[[ "$output" != *'pull request is missing'* ]] || fail "lookup failure was reported as a missing PR: $output"
+[[ "$(grep -c '^pr view ' "$log")" -eq 3 ]] || fail "expected 3 lookup attempts, got $(grep -c '^pr view ' "$log")"
+! grep -q '^pr merge ' "$log" || fail "failed lookup attempted merge"
+printf 'PASS: a persistent PR lookup failure reports the gh error\n'
 
 new_fixture feat/merge
 set +e
