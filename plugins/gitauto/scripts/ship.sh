@@ -221,7 +221,8 @@ run() {
     [[ "$merged" == yes ]] && word='PARTIAL'
     case "$1" in
       verify) printf -- '--- failure: verify (last %s lines)\n' "$FAIL_LINES"; tail -n "+$mark" "$log" | tail -n "$FAIL_LINES" ;;
-      wait-ci) ci_failure ;;
+      # Only a red check has logs to show; state=error means gh could not read CI.
+      wait-ci) [[ "$st" != failed ]] || ci_failure ;;
     esac
     printf '%s stage=%s state=%s report=%s%s log=%s\n' "$word" "$1" "${st:-none}" "${2:-$(kv report)}" \
       "${url:+ url=$url}" "$log"
