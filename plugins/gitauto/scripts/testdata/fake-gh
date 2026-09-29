@@ -25,7 +25,10 @@ case "${1:-} ${2:-}" in
     if [[ -f "$s/cislow" && -z "$json" ]]; then sleep 20; fi
     # cilate: a check that registered after the watch ended; merge's check sees it pending once.
     if [[ -f "$s/cilate" && "$*" != *--watch* ]]; then rm "$s/cilate"; printf 'lint\tpending\n'; exit 8; fi
+    # cidown: GitHub is unreachable, so every checks call errors like a reset connection.
+    if [[ -f "$s/cidown" ]]; then printf 'Post "https://api.github.com/graphql": connection reset by peer\n' >&2; exit 1; fi
     if [[ -f "$s/cifail" ]]; then
+      if [[ "$json" == bucket ]]; then printf 'pass\nfail\n'; exit 0; fi
       if [[ -n "$json" ]]; then printf 'build\thttps://github.com/o/r/actions/runs/99/job/1\n'; exit 0; fi
       printf 'build\tfail\n'; exit 1
     fi

@@ -133,6 +133,14 @@ CI; a repo without CI pays that wait once per ship. A check that registers
 after the wait has ended shows up as pending at merge time, and `run` then waits
 again, up to 3 rounds.
 
+`gh pr checks` exits with the same code for a red check as for a dropped
+connection, so when a watch ends with an error the CI wait reads each check's
+state before it decides. It stops for a red check, is green when every check
+has passed, and watches again when checks are still running. It retries up to
+`GITAUTO_CHECKS_RETRIES` times (default 3), `GITAUTO_CHECKS_RETRY_INTERVAL`
+seconds apart (default 10), and then stops with `state=error` and the last `gh`
+error. That stop has no `--- failure` block, and a re-run resumes.
+
 If CI is still running when the budget runs out, `run` exits with
 `WAITING stage=wait-ci pr=#N ...`. The command then runs `ship.sh run` again
 with the same `--tag` and `--delete-remote` flags, up to 5 more times. A re-run

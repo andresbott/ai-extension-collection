@@ -115,6 +115,17 @@ grep -q '^--- FAIL: TestThing$' <<<"$out" || fail "failed log missing or not str
 pass "red CI stops before merge and returns failed checks and logs"
 
 fixture
+git -C "$repo" switch -qc feat/offline
+printf 'offline\n' >> "$repo/README.md"
+touch "$FAKE_GH/cidown"
+out="$(GITAUTO_CHECKS_RETRIES=0 ship run --title 'feat: offline' --body-stdin <<<'body')"
+grep -q '^STOPPED stage=wait-ci state=error report=could not read CI status (.*connection reset by peer); re-run to resume ' <<<"$out" ||
+  fail "gh error: $out"
+! grep -q -- '^--- failure' <<<"$out" || fail "a gh error is not a CI failure: $out"
+[[ ! -f "$FAKE_GH/merge" ]] || fail "must not merge when CI cannot be read"
+pass "a gh error during the CI wait stops as an error, not as red CI"
+
+fixture
 git -C "$repo" switch -qc feat/slow
 printf 'verify:\n\t@echo run >> $(MARK)\n' > "$repo/Makefile"
 export MARK="$root/verify-runs"
