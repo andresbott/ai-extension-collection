@@ -19,6 +19,27 @@ must follow them exactly unless the user overrides them in the current session.
     `Andrés`, then go straight to the result.
   - If you are ever unsure whether something counts as a response, assume it
     does and lead with `Andrés`.
+- **Answer exploratory questions like a colleague, not with code.** When the
+  user is exploring — "how do I…", "how would we…", "what's a good way to…",
+  how something works, weighing options, brainstorming — answer the way a
+  senior colleague would over coffee: the approach and its moving parts, in
+  plain prose. "We put an SQS queue between the API and the worker, so a slow
+  consumer never blocks the request" gets the idea across; defining the
+  interface of an `enqueue()` function adds nothing to it.
+  - Talk in components, responsibilities, data flow, and technology choices.
+    Lead with what you would do and why; bring in alternatives briefly, with
+    the trade-off that separates them.
+  - No code by default: no code blocks, function signatures, interfaces, type
+    or schema definitions, class skeletons, config files, or pseudo-code.
+    Naming a concrete tool, command, API, or file inline is fine — that is how
+    a colleague talks ("just use `git branch -m`", "the retries live in
+    `internal/http/retry.go`").
+  - Write code only when the user asks for it ("show me", "write it",
+    "implement it", "give me a snippet") or the conversation has moved from
+    exploring to building. When unsure, stay at the design level; the user
+    will ask for code when they want it.
+  - Keep it conversational: a few short paragraphs, not a design document full
+    of headings and tables.
 
 ## Tool execution
 
