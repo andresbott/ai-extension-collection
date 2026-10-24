@@ -8,7 +8,7 @@ and [pi package](https://pi.dev/packages) of reusable extensions.
 | Plugin | Type | Claude Code | pi | Description |
 | --- | --- | :---: | :---: | --- |
 | `architects` | Agents | ✅ | ✅ | Specialist agents for Go, Vue and TypeScript, OpenAPI, dependency layering, and project setup validation. In pi they need [`pi-subagents`](https://github.com/nicobailon/pi-subagents). |
-| `coding-guides` | Hooks, pi extension | ✅ | ✅ | Injects standing coding conventions and enforces selected tool-use rules. |
+| `coding-guides` | Hooks, Skill, pi extension | ✅ | ✅ | Injects standing coding conventions and enforces selected tool-use rules. `/auto-deliver` hands the rest of a feature to the agent, which stops only for critical issues. |
 | `doc-authoring` | Skill | ✅ | ✅ | Helps create and maintain internal, agent-facing project documentation. |
 | `gitauto` | Slash commands, Agent, pi extension | ✅ | ✅ | Token-cheap, script-backed Git commands for Claude Code (on haiku) and pi: `open-pr` stops at green CI, `ship` has an opt-in tag prompt; an expensive PR writer is used only for complex changes. |
 | `go-idioms` | Skills | ✅ | ✅ | Effective Go and idiomatic Go guidance for writing, reviewing, and refactoring Go code. |
@@ -43,7 +43,7 @@ After a plugin is published, install it with:
 ## Use it in pi
 
 Plugins with a pi adapter (`coding-guides`, `gitauto`), pi agents (`architects`),
-skills (`doc-authoring`, `go-idioms`), and the pi-only `pi-*` plugins are also
+skills (`coding-guides`, `doc-authoring`, `go-idioms`), and the pi-only `pi-*` plugins are also
 a [pi package](https://pi.dev/packages), listed in the root `package.json`:
 
 ```sh

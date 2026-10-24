@@ -6,7 +6,7 @@
     "email": "contact@andresbott.com"
   },
   "description": "Claude Code extensions marketplace",
-  "version": "0.18.0",
+  "version": "0.19.0",
   "plugins": [
     {
       "name": "architects",
@@ -16,7 +16,7 @@
     {
       "name": "coding-guides",
       "source": "./plugins/coding-guides",
-      "description": "Injects standing coding conventions and enforces selected tool-use rules."
+      "description": "Injects standing coding conventions, enforces selected tool-use rules, and adds /auto-deliver to hand off the rest of a feature."
     },
     {
       "name": "doc-authoring",
