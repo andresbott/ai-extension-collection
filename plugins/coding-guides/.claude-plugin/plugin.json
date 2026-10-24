@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "coding-guides",
-  "description": "Injects the user's standing coding conventions (tool-use, git, and skill-handling preferences) into every session via a SessionStart hook, and enforces select rules (e.g. single-line commit messages) via a PreToolUse hook. Ships a pi adapter that does the same from the same files, and a user-invoked /auto-deliver skill that hands the rest of a feature to the agent.",
-  "version": "0.5.0",
+  "description": "Injects the user's standing coding conventions (tool-use, git, PR, code-structure, and skill-handling preferences) into every session via SessionStart hooks, gives subagents the code-writing ones via SubagentStart hooks, and enforces select rules (e.g. single-line commit messages) via a PreToolUse hook. Ships a pi adapter that injects the same guides and enforces the same rules from the same files, and a user-invoked /auto-deliver skill that hands the rest of a feature to the agent.",
+  "version": "0.6.0",
   "author": {
     "name": "Andres Bott",
     "email": "contact@andresbott.com"

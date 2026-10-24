@@ -323,21 +323,25 @@ type ReadWriteCloser interface {
 ### Define Interfaces Where They're Used
 
 ```go
-// In the consumer package, not the provider
-package service
+// In the consumer module, not the provider
+package invoices
 
-// UserStore defines what this service needs
-type UserStore interface {
-    GetUser(id string) (*User, error)
-    SaveUser(user *User) error
+// Customers is the one thing invoices needs from the customers module
+type Customers interface {
+    Name(ctx context.Context, id string) (string, error)
 }
 
 type Service struct {
-    store UserStore
+    db        *sql.DB
+    customers Customers
 }
 
-// Concrete implementation can be in another package
-// It doesn't need to know about this interface
+func New(db *sql.DB, customers Customers) *Service {
+    return &Service{db: db, customers: customers}
+}
+
+// app/app.go passes *customers.Store in: invoices never imports customers,
+// and customers never needs to know this interface exists
 ```
 
 ### Optional Behavior with Type Assertions
@@ -362,6 +366,49 @@ func WriteAndFlush(w io.Writer, data []byte) error {
 
 ## Package Organization
 
+### Project Layout
+
+Unless the project documents its own layout, an application has three tiers,
+and imports only point down: `app/` → `internal/` → `libs/`.
+
+```text
+invoicer/
+├── cmd/invoicer/main.go   # calls into app/; nothing else
+├── app/                   # glue: wiring, transport, triggers
+│   ├── app.go             # builds every module and library, passes references between them
+│   ├── handlers/          # one central package, one file per area
+│   │   ├── invoices.go
+│   │   └── customers.go
+│   └── jobs/              # scheduled triggers that call modules
+├── internal/              # business modules, one concern each
+│   ├── invoices/          # invoice rules, its store, its tables
+│   ├── customers/         # customer rules, its store, its tables
+│   └── payments/
+└── libs/                  # foundation: capabilities with no business knowledge
+    ├── pdf/               # renders documents; has never heard of an invoice
+    └── mailer/            # sends mail through a provider
+```
+
+- **`app/` is the glue.** `app.go` constructs the modules and libraries and
+  hands each its dependencies; handlers and jobs translate a request or trigger
+  into module calls. A handler may call several modules; business rules live
+  in the modules.
+- **Each module in `internal/` owns one business concern end to end:** its
+  rules, its store, and its tables. The SQL for `invoices` lives in
+  `internal/invoices`, not in a shared `sqlite/` or `repository/` package.
+- **Modules stay out of each other's packages.** When `invoices` needs a
+  customer's name, it declares a small interface for exactly that (see Define
+  Interfaces Where They're Used) and `app.go` passes `*customers.Store` in.
+  Reads go through the owner too: `invoices` never queries the customers table.
+- **A capability you can describe without business words goes in `libs/` from
+  day one** — PDF rendering, mail, search, an embedding or payment provider
+  client — even with a single consumer. It works on plain data and plain IDs;
+  the module that uses it decides what to hand over and maps results back to
+  its own records.
+- **Imports point down only:** `libs/` imports neither `internal/` nor `app/`,
+  and `internal/` never imports `app/`.
+
+A small single-purpose tool can stay flat: `main.go` plus a package or two.
 
 ### Package Naming
 
