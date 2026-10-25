@@ -5,7 +5,33 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/inject-guides.sh\""
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/inject-guides.sh\" SessionStart working-with-the-user.md"
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/inject-guides.sh\" SessionStart tools-and-git.md"
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/inject-guides.sh\" SessionStart pull-requests.md"
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/inject-guides.sh\" SessionStart code-structure.md"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/inject-guides.sh\" SubagentStart tools-and-git.md"
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/inject-guides.sh\" SubagentStart code-structure.md"
           }
         ]
       }

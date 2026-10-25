@@ -2,10 +2,15 @@
 // the real shared script decides tool calls.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 
-import codingGuides, { GUIDES, SECTION } from "./index.ts";
+import codingGuides, { SECTION } from "./index.ts";
+
+// Listed from disk, not from index.ts, so a guide missing from its list fails.
+const CONTEXT = fileURLToPath(new URL("../context/", import.meta.url));
 
 // Without jq the shared script can't parse the payload and blocks every commit
 // with an install hint, so the rule-specific reasons below need jq.
@@ -29,10 +34,15 @@ test("registers the prompt and tool-call handlers", () => {
   assert.ok(handlers.has("tool_call"));
 });
 
-test("adds the shared guides as a system-prompt section", () => {
+test("adds every context file to the system-prompt section", () => {
   const event = { systemPromptOptions: { sections: { other: "keep" } as Record<string, string> } };
   load().get("before_agent_start")!(event);
-  assert.equal(event.systemPromptOptions.sections[SECTION], readFileSync(GUIDES, "utf8"));
+  const section = event.systemPromptOptions.sections[SECTION];
+  const files = readdirSync(CONTEXT).filter((name) => name.endsWith(".md"));
+  assert.ok(files.length > 0);
+  for (const name of files) {
+    assert.ok(section.includes(readFileSync(join(CONTEXT, name), "utf8")), `${name} is missing from the section`);
+  }
   assert.equal(event.systemPromptOptions.sections.other, "keep");
 });
 
