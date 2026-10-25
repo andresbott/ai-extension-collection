@@ -8,7 +8,7 @@ and [pi package](https://pi.dev/packages) of reusable extensions.
 | Plugin | Type | Claude Code | pi | Description |
 | --- | --- | :---: | :---: | --- |
 | `architects` | Agents | ✅ | ✅ | Specialist agents for Go, Vue and TypeScript, OpenAPI, dependency layering, and project setup validation. In pi they need [`pi-subagents`](https://github.com/nicobailon/pi-subagents). |
-| `coding-guides` | Hooks, Skill, pi extension | ✅ | ✅ | Injects standing coding conventions into the session and its subagents, and enforces selected tool-use rules. `/auto-deliver` hands the rest of a feature to the agent, which stops only for critical issues. |
+| `coding-guides` | Hooks, Skills, pi extension | ✅ | ✅ | Injects standing coding conventions into the session and its subagents, and enforces selected tool-use rules. `/auto-deliver` hands the rest of a feature to the agent, which stops only for critical issues. `/tldr` sums up the last answer, the work so far, or a topic in a few plain-language bullet points, without code names or jargon. |
 | `doc-authoring` | Skill | ✅ | ✅ | Helps create and maintain internal, agent-facing project documentation. |
 | `gitauto` | Slash commands, Agent, pi extension | ✅ | ✅ | Token-cheap, script-backed Git commands for Claude Code (on haiku) and pi: `open-pr` stops at green CI, `ship` has an opt-in tag prompt; an expensive PR writer is used only for complex changes. |
 | `go-idioms` | Skills | ✅ | ✅ | Effective Go and idiomatic Go guidance for writing, reviewing, and refactoring Go code. |
