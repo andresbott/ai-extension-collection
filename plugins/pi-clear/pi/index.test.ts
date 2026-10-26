@@ -8,9 +8,9 @@ function makeFakePi() {
   const commands = new Map();
   const handlers = new Map();
   const pi = {
-    registerCommand: (name, opts) => commands.set(name, opts),
-    on: (event, handler) => handlers.set(event, handler),
-  };
+    registerCommand: (name: string, opts: unknown) => commands.set(name, opts),
+    on: (event: string, handler: unknown) => handlers.set(event, handler),
+  } as any;
   return { pi, commands, handlers };
 }
 
@@ -32,8 +32,8 @@ test("context handler is a no-op until /clear is invoked", () => {
 test("after /clear the context handler hides the prior conversation", async () => {
   const { pi, commands, handlers } = makeFakePi();
   piClear(pi);
-  const notes = [];
-  const ctx = { ui: { notify: (m) => notes.push(m) } };
+  const notes: string[] = [];
+  const ctx = { ui: { notify: (m: string) => notes.push(m) } };
 
   await commands.get("clear").handler("", ctx);
   const result = handlers.get("context")({

@@ -1,22 +1,24 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { sideCall } from "./side-call.ts";
+import { sideCall, type SideCallReply } from "./side-call.ts";
 
 // A stand-in for Pi's ModelRegistry.streamSimple: records each call and answers
 // with the given reply (or rejects with the given error).
-function makeRegistry(reply: unknown, fail?: Error) {
+function makeRegistry(reply: SideCallReply | undefined, fail?: Error) {
   const calls: { model: unknown; context: any; options: any }[] = [];
   const registry = {
     streamSimple: (model: unknown, context: unknown, options: unknown) => {
       calls.push({ model, context, options });
-      return { result: async () => (fail ? Promise.reject(fail) : reply) };
+      return { result: async (): Promise<SideCallReply> => (fail || !reply ? Promise.reject(fail) : reply) };
     },
   };
   return { registry, calls };
 }
 
-const ok = (...parts: unknown[]) => ({ stopReason: "stop", content: parts });
+// Reply blocks may carry fields the module ignores (e.g. a thinking block's `thinking`).
+type Block = SideCallReply["content"][number] & Record<string, unknown>;
+const ok = (...parts: Block[]) => ({ stopReason: "stop", content: parts });
 
 test("sends the prompt as one user message to the given model and returns its text", async () => {
   const { registry, calls } = makeRegistry(

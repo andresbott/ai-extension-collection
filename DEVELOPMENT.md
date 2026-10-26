@@ -34,6 +34,9 @@ A plugin can also work in pi. Keep both harnesses on one core:
 - List the adapter in the root `package.json` under `pi.extensions`.
 - Put its tests next to it as `pi/*.test.ts`. Node runs them directly
   (`npm run test:pi`).
+- Type-check with `npm install` once, then `npm run typecheck`. The pi
+  packages are devDependencies only for their types: pi installs git packages
+  with `--omit=dev` and serves its own copies to extensions at runtime.
 
 ## Share skills with pi
 

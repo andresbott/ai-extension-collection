@@ -98,6 +98,22 @@ function createAll(cwd: string) {
 
 type BuiltInName = keyof ReturnType<typeof createAll>;
 
+type AnyBuiltIn = ReturnType<typeof createAll>[BuiltInName];
+
+/**
+ * The built-ins seen through one shape. Indexing the record with a union name
+ * would intersect their parameter types; each spec only ever runs the tool it
+ * was registered from (same seed schema), so its params always match.
+ */
+interface BuiltInExecutor {
+	execute(
+		toolCallId: string,
+		params: unknown,
+		signal?: AbortSignal,
+		onUpdate?: Parameters<AnyBuiltIn["execute"]>[3],
+	): ReturnType<AnyBuiltIn["execute"]>;
+}
+
 interface ToolSpec {
 	name: BuiltInName;
 	/** Compact, colored one-line rendering of the tool call. */
@@ -192,7 +208,8 @@ export function registerToolOverrides(pi: ExtensionAPI, getMode: () => RenderMod
 			renderShell: "self",
 
 			async execute(toolCallId, params, signal, onUpdate, ctx) {
-				return builtIns(ctx.cwd)[spec.name].execute(toolCallId, params, signal, onUpdate);
+				const tool: BuiltInExecutor = builtIns(ctx.cwd)[spec.name];
+				return tool.execute(toolCallId, params, signal, onUpdate);
 			},
 
 			renderCall(args, theme, _context) {
