@@ -28,10 +28,12 @@ fixture() {
 }
 ship() { (cd "$repo" && "$SCRIPT" "$@") || true; }
 on() { git -C "$repo" branch --show-current; }
+# The result line for people, right above the final status line.
+result() { tail -n 2 <<<"$1" | head -n 1; }
 
 fixture
 out="$(ship prepare '')"
-[[ "$out" == "DONE state=nothing branch=main report=nothing to ship" ]] || fail "nothing: $out"
+[[ "$out" == $'success: nothing to ship on main\nDONE state=nothing branch=main report=nothing to ship' ]] || fail "nothing: $out"
 pass "clean main has nothing to ship"
 
 printf 'change\n' >> "$repo/README.md"
@@ -56,11 +58,18 @@ grep -q '^STOPPED stage=branch ' <<<"$out" || fail "branch required: $out"
 [[ "$(on)" == main ]] || fail "should stay on main"
 pass "run on main without branch candidates stops before any mutation"
 
+out="$(ship run --branch 'bad..name' --title 'feat: x')"
+grep -q '^STOPPED stage=branch state=failed report=no valid branch name candidate log=' <<<"$out" || fail "bad branch: $out"
+[[ "$(result "$out")" == 'error: failed to create a feature branch: no valid branch name candidate' ]] || fail "bad branch result: $out"
+[[ "$(on)" == main ]] || fail "should stay on main"
+pass "a branch-out failure inside run stops with its reason"
+
 out="$(ship draft --title 'feat: add change' --body-stdin <<<'## Summary
 Because.')"
 [[ "$out" == "DRAFTED title=feat: add change" ]] || fail "draft: $out"
 out="$(ship run --branch feat/change)"
 grep -q '^SHIPPED pr=#7 url=https://github.com/o/r/pull/7 sync=synced cleanup=clean ' <<<"$out" || fail "ship: $out"
+[[ "$(result "$out")" == 'success: ship finished: PR #7 merged, main synced, branch cleaned up' ]] || fail "ship result: $out"
 [[ "$(on)" == main ]] || fail "should be back on main, got $(on)"
 [[ "$(git -C "$repo" log -1 --format=%s feat/change)" == "feat: add change" ]] || fail "commit message not taken from draft title"
 grep -q 'Because.' "$FAKE_GH/body" || fail "draft body not used"
@@ -101,6 +110,7 @@ grep -q '^--- failure: verify' <<<"$out" || fail "verify failure block missing: 
 grep -q '^boom-from-verify$' <<<"$out" || fail "verify output not returned: $out"
 grep -q '^ship: \[1\] verify -> fail$' <<<"$out" || fail "progress missing: $out"
 [[ "$(tail -n 1 <<<"$out")" == STOPPED* ]] || fail "final line must be last: $out"
+[[ "$(result "$out")" == 'error: failed to verify the changes: make verify failed' ]] || fail "verify result: $out"
 [[ -n "$(git -C "$repo" status --porcelain)" ]] || fail "nothing should be committed"
 [[ ! -f "$FAKE_GH/head" ]] || fail "no PR should be opened"
 pass "failed verification stops before commit and returns its output"
@@ -113,6 +123,7 @@ out="$(ship run --title 'feat: red' --body-stdin <<<'body')"
 grep -q '^STOPPED stage=wait-ci state=failed .* url=https://github.com/o/r/pull/7 ' <<<"$out" || fail "ci: $out"
 grep -q '^failed check: build$' <<<"$out" || fail "check name missing: $out"
 grep -q '^--- FAIL: TestThing$' <<<"$out" || fail "failed log missing or not stripped: $out"
+[[ "$(result "$out")" == 'error: failed to get CI green: one or more CI checks failed' ]] || fail "ci result: $out"
 [[ ! -f "$FAKE_GH/merge" ]] || fail "must not merge on red CI"
 [[ "$(on)" == feat/red ]] || fail "must stay on the branch to fix it"
 pass "red CI stops before merge and returns failed checks and logs"
@@ -135,6 +146,7 @@ export MARK="$root/verify-runs"
 touch "$FAKE_GH/cislow"
 out="$(cd "$repo" && GITAUTO_CMD_RUN_BUDGET=1 GITAUTO_CMD_CI_MIN=1 "$SCRIPT" run --title 'feat: slow' --body-stdin <<<'body' || true)"
 grep -q '^WAITING stage=wait-ci pr=#7 ' <<<"$out" || fail "waiting: $out"
+[[ "$(result "$out")" == 'warning: CI is still running on PR #7; run /gitauto:ship again to resume' ]] || fail "waiting result: $out"
 [[ ! -f "$FAKE_GH/merge" ]] || fail "must not merge while CI runs"
 rm "$FAKE_GH/cislow"
 out="$(ship run)"
@@ -172,6 +184,7 @@ pass "ship recommends a tag but never creates one by default"
 
 out="$(ship tag v1.1.0)"
 grep -q '^TAGGED version=v1.1.0 latest=v1.0.0 ' <<<"$out" || fail "tag: $out"
+[[ "$(result "$out")" == 'success: tagged v1.1.0' ]] || fail "tag result: $out"
 [[ "$(cat "$root/tagged")" == v1.1.0 ]] || fail "make tag did not run with the chosen version"
 pass "an explicitly chosen version is tagged via make tag"
 
@@ -179,6 +192,13 @@ tag_fixture
 out="$(ship run --no-tag --title 'feat: untagged' --body-stdin <<<'body')"
 grep -q '^SHIPPED .* tag=declined ' <<<"$out" || fail "no-tag: $out"
 pass "--no-tag skips the tag question"
+
+tag_fixture
+out="$(ship run --tag v0.9.0 --title 'feat: low tag' --body-stdin <<<'body')"
+grep -q '^PARTIAL .* tag=failed tag_report=version must be greater than the latest tag ' <<<"$out" || fail "partial: $out"
+[[ "$(result "$out")" == 'warning: PR #7 merged, main synced, but tag v0.9.0 failed: version must be greater than the latest tag' ]] ||
+  fail "partial result: $out"
+pass "a tag that fails after the merge is a PARTIAL with a warning"
 
 fixture
 git -C "$repo" switch -qc feat/notarget
@@ -192,6 +212,7 @@ git -C "$repo" switch -qc feat/review
 printf 'review me\n' >> "$repo/README.md"
 out="$(ship open-pr --title 'feat: review me' --body-stdin <<<'body')"
 grep -q '^READY pr=#7 url=https://github.com/o/r/pull/7 ci=green ' <<<"$out" || fail "open-pr: $out"
+[[ "$(result "$out")" == 'success: PR #7 is ready: CI is green; run /gitauto:ship to merge' ]] || fail "open-pr result: $out"
 [[ ! -f "$FAKE_GH/merge" ]] || fail "open-pr must not merge"
 [[ "$(on)" == feat/review ]] || fail "open-pr must stay on the branch"
 out="$(ship prepare '')"
@@ -249,6 +270,7 @@ git -C "$repo" switch -qc feat/bad
 printf 'bad\n' >> "$repo/README.md"
 out="$(ship run --title 'Fine title' --subject 'not conventional' --body-stdin <<<'body')"
 grep -q '^DONE state=failed report=--subject must be' <<<"$out" || fail "bad subject: $out"
+[[ "$(result "$out")" == 'error: --subject must be a one-line Conventional Commit subject' ]] || fail "bad subject result: $out"
 [[ -n "$(git -C "$repo" status --porcelain)" ]] || fail "nothing should be committed"
 pass "an invalid subject fails before any mutation"
 
@@ -269,9 +291,11 @@ out="$(ship prepare '')"
   fail "ask: $out"
 ! grep -q '^pr view' "$FAKE_GH/log" || fail "the account question must come before the PR lookup"
 out="$(ship account c)"
-[[ "$out" == 'DONE state=failed report=c is not logged in to gh on github.com (logged in: a,b)' ]] || fail "unknown pick: $out"
+[[ "$out" == $'error: c is not logged in to gh on github.com (logged in: a,b)\nDONE state=failed report=c is not logged in to gh on github.com (logged in: a,b)' ]] ||
+  fail "unknown pick: $out"
 out="$(ship account b)"
-[[ "$out" == 'DONE state=saved account=b host=github.com repo=o/r report=b chosen for o/r' ]] || fail "pick: $out"
+[[ "$out" == $'success: saved b as the gh account for o/r\nDONE state=saved account=b host=github.com repo=o/r report=b chosen for o/r' ]] ||
+  fail "pick: $out"
 out="$(ship prepare '')"
 grep -q '^SHIP branch=feat/account .* need=pr writer=cheap$' <<<"$out" || fail "prepare after the pick: $out"
 grep -q $'^tok-b\tpr view feat/account ' "$FAKE_GH/tokens" || fail "PR lookup without b's token: $(cat "$FAKE_GH/tokens")"
@@ -294,19 +318,40 @@ git -C "$repo" switch -qc feat/hidden
 printf 'hidden\n' >> "$repo/README.md"
 touch "$FAKE_GH/prerror"
 out="$(ship prepare '')"
-[[ "$out" == "DONE state=failed report=pull request lookup failed: GraphQL: Could not resolve to a Repository with the name 'o/r'. (repository)" ]] ||
+[[ "$out" == "error: pull request lookup failed: GraphQL: Could not resolve to a Repository with the name 'o/r'. (repository)"$'\n'"DONE state=failed report=pull request lookup failed: GraphQL: Could not resolve to a Repository with the name 'o/r'. (repository)" ]] ||
   fail "lookup error: $out"
 pass "a PR lookup error stops prepare with gh's message instead of reading as no PR"
+
+fixture
+git -C "$repo" switch -qc feat/refused
+printf 'refused\n' >> "$repo/README.md"
+touch "$FAKE_GH/prcreate-error"
+out="$(ship run --title 'feat: refused' --body-stdin <<<'body')"
+emu='GraphQL: Unauthorized: As an Enterprise Managed User, you cannot access this content (createPullRequest)'
+grep -qF "STOPPED stage=open-pr state=failed report=pull request creation failed: $emu log=" <<<"$out" || fail "refused: $out"
+[[ "$(result "$out")" == "error: failed to open the pull request: pull request creation failed: $emu" ]] || fail "refused result: $out"
+pass "a refused PR creation stops with gh's error"
+
+# A helper that dies under set -e prints no report; its last logged error stands in.
+fixture
+git -C "$repo" switch -qc feat/rejected
+printf 'rejected\n' >> "$repo/README.md"
+printf '#!/bin/sh\necho "rejected by policy" >&2\nexit 1\n' > "$remote/hooks/pre-receive"; chmod +x "$remote/hooks/pre-receive"
+out="$(ship run --title 'feat: rejected' --body-stdin <<<'body')"
+grep -qF "STOPPED stage=push state=error report=failed to push some refs to '$remote' log=" <<<"$out" || fail "rejected push: $out"
+[[ "$(result "$out")" == "error: failed to push the branch: failed to push some refs to '$remote'" ]] || fail "rejected result: $out"
+pass "a helper that dies without a report stops with the last error it logged"
 
 fixture
 cp "$TESTDATA/fake-ssh" "$bin/ssh"; chmod +x "$bin/ssh"
 git -C "$repo" remote set-url origin git@work-alias:o/r.git
 printf 'github.com' > "$FAKE_GH/auth-only"
 out="$(ship prepare '')"
-[[ "$out" == "DONE state=nothing branch=main report=nothing to ship" ]] || fail "broken login elsewhere blocked prepare: $out"
+[[ "$(tail -n 1 <<<"$out")" == "DONE state=nothing branch=main report=nothing to ship" ]] || fail "broken login elsewhere blocked prepare: $out"
 printf 'git.corp.example' > "$FAKE_GH/auth-only"
 out="$(ship prepare '')"
-[[ "$out" == "DONE state=failed report=GitHub CLI is unavailable or unauthenticated" ]] || fail "origin host without a login passed: $out"
+[[ "$out" == $'error: GitHub CLI is unavailable or unauthenticated\nDONE state=failed report=GitHub CLI is unavailable or unauthenticated' ]] ||
+  fail "origin host without a login passed: $out"
 pass "prepare checks gh auth for the origin host only"
 
 # prepare cuts the patch at GITAUTO_CMD_PATCH_LINES on purpose, and pipefail

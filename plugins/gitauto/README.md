@@ -90,7 +90,8 @@ TypeScript, so no model decides how to run it:
 - **`!` preprocessing** runs `scripts/branch-out.sh` before the model sees the
   prompt, so there's no exploratory tool call.
 - **Zero-tool paths.** Already on a feature branch, or given a valid explicit
-  name: the script finishes during preprocessing and prints one `DONE` line.
+  name: the script finishes during preprocessing and prints a result line
+  (`success: ...` or `error: ...`) followed by one `DONE` line.
 - **One tool call otherwise.** The script prints `NEED_NAME` and at most 25
   lines of `git status --short`. The model proposes 3 names and calls `--create`
   once.
@@ -237,10 +238,17 @@ so the target can read either spelling.
 - **Progress:** `run` prints a `ship: started; live output: tail -f <log>` line,
   then `ship: [n] <stage> ...` and `ship: [n] <stage> -> <state>` for each
   stage. `tail -f` the log for full live output, including the CI watch.
+- **Every outcome says what happened.** `ship.sh` and `branch-out.sh` print a
+  result line for people right before each outcome line: `success: ...`,
+  `warning: ...` (CI still running, or merged but sync/cleanup/tag
+  incomplete), or `error: failed to <step>: <why>`. Every command shows it
+  first.
+- **The reason is never empty.** When a helper dies without a report (a `gh`
+  or `git` error under `set -e`), the report is the last error it logged.
 - **Failures come back into the session.** When verification or CI fails,
-  `run` prints a `--- failure` block just before the final line. For verify,
-  it holds the last 60 lines of its output. For CI, it holds the failed check
-  names and the last 60 lines of up to 2 failed runs'
+  `run` prints a `--- failure` block just before the result and outcome lines.
+  For verify, it holds the last 60 lines of its output. For CI, it holds the
+  failed check names and the last 60 lines of up to 2 failed runs'
   `gh run view --log-failed`, with timestamps stripped. The command quotes the
   block and names the likely cause without trying a fix, so you can ask the
   session to fix it and ship again (the existing PR is reused). The number of
@@ -282,6 +290,7 @@ SHIP ... need=... writer=... / NEED_NAME ...            # prepare / branch-out: 
 --- write                                               # then `<key>: <rule>` per text to write
 ship: [n] <stage> ... / -> <state>                      # progress, one pair per stage
 --- failure: verify|wait-ci ...                         # only on those failures
+success: ... / warning: ... / error: ...                # result line, right before each outcome line
 SHIPPED pr=#N url=... sync=synced cleanup=clean ... tag=ask|declined|none|tagged ... log=<file>
 READY pr=#N url=... ci=green|none log=<file>            # open-pr: PR open, CI green, not merged
 TAGGED version=<v> latest=<v> log=<file>                # after an explicitly chosen tag

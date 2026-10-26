@@ -13,10 +13,12 @@ for <repo>? It is saved for this clone.", with one option per login in
 `${CLAUDE_PLUGIN_ROOT}/scripts/ship.sh account '<login>'`. If that prints
 `DONE state=saved`, run `${CLAUDE_PLUGIN_ROOT}/scripts/ship.sh prepare '$ARGUMENTS'`
 and use its output in place of the output above from here on. With no pick,
-reply with the `NEED_ACCOUNT` line verbatim; on any other `account` output, reply
-with that line verbatim. Then stop.
+reply with `error: no GitHub account chosen, so nothing was shipped`, then the
+`NEED_ACCOUNT` line verbatim; on any other `account` output, reply with that
+output verbatim. Then stop.
 
-If the output starts with `DONE`, reply with that line verbatim. Call no tools.
+If the output starts with `success:` or `error:`, the run ends here: reply with
+the output verbatim (its result line, then its `DONE` line). Call no tools.
 
 Otherwise read the `SHIP` line and prepare the text:
 
@@ -57,9 +59,10 @@ answer, means no tag. Never tag without an explicit choice.
 
 Otherwise, do not re-run anything. Reply with:
 
-- the run's last line verbatim (`SHIPPED`, `PARTIAL`, `STOPPED`, or a final
-  `WAITING`), plus the `TAGGED`/`STOPPED stage=tag` line if you ran `tag`, or
-  "no tag created" if the user declined;
-- if a `--- failure` block precedes that line, the block verbatim (it holds the
-  failed verify output or the failed CI checks and their logs), followed by one
-  sentence naming the most likely cause. Do not attempt a fix; the user decides.
+- the run's last two lines verbatim: the result line (`success:`, `warning:`, or
+  `error:`), then the outcome line (`SHIPPED`, `PARTIAL`, `STOPPED`, or a final
+  `WAITING`). If you ran `tag`, add its two lines the same way; if the user
+  declined, add "no tag created";
+- if a `--- failure` block precedes those two lines, the block verbatim (it holds
+  the failed verify output or the failed CI checks and their logs), followed by
+  one sentence naming the most likely cause. Do not attempt a fix; the user decides.

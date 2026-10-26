@@ -68,7 +68,7 @@ export default function gitauto(pi: ExtensionAPI) {
           await ctx.waitForIdle();
           report = await flow(makeDeps(ctx, progress), args.trim());
         } catch (err) {
-          report = `failed: ${err instanceof Error ? err.message : String(err)}`;
+          report = `error: ${err instanceof Error ? err.message : String(err)}`;
           ctx.ui.notify(`gitauto:${name} ${report}`, "error");
         } finally {
           progress.clear();

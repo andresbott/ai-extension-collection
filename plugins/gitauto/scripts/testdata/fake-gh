@@ -33,6 +33,10 @@ case "${1:-} ${2:-}" in
     fi ;;
   'repo view') exit 1 ;;
   'pr create')
+    # prcreate-error: gh refuses to create the PR, as for an Enterprise Managed User.
+    if [[ -f "$s/prcreate-error" ]]; then
+      printf 'pull request create failed: GraphQL: Unauthorized: As an Enterprise Managed User, you cannot access this content (createPullRequest)\n' >&2; exit 1
+    fi
     while [[ $# -gt 0 ]]; do case "$1" in --head) printf '%s' "$2" > "$s/head" ;; --title) printf '%s' "$2" > "$s/title" ;; --body) printf '%s' "$2" > "$s/body" ;; esac; shift; done
     git rev-parse HEAD > "$s/oid"
     printf 'https://github.com/o/r/pull/7\n' ;;

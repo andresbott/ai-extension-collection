@@ -13,10 +13,12 @@ for <repo>? It is saved for this clone.", with one option per login in
 `${CLAUDE_PLUGIN_ROOT}/scripts/ship.sh account '<login>'`. If that prints
 `DONE state=saved`, run `${CLAUDE_PLUGIN_ROOT}/scripts/ship.sh prepare --for pr '$ARGUMENTS'`
 and use its output in place of the output above from here on. With no pick,
-reply with the `NEED_ACCOUNT` line verbatim; on any other `account` output, reply
-with that line verbatim. Then stop.
+reply with `error: no GitHub account chosen, so nothing was shipped`, then the
+`NEED_ACCOUNT` line verbatim; on any other `account` output, reply with that
+output verbatim. Then stop.
 
-If the output starts with `DONE`, reply with that line verbatim. Call no tools.
+If the output starts with `success:` or `error:`, the run ends here: reply with
+the output verbatim (its result line, then its `DONE` line). Call no tools.
 
 Otherwise read the `SHIP` line and prepare the text:
 
@@ -45,8 +47,9 @@ nothing in between.
 
 Otherwise, do not re-run it. Reply with:
 
-- its last line verbatim (`READY`, `STOPPED`, or a final `WAITING`); after
-  `READY`, add "run /gitauto:ship to merge";
-- if a `--- failure` block precedes that line, the block verbatim (it holds the
-  failed verify output or the failed CI checks and their logs), followed by one
-  sentence naming the most likely cause. Do not attempt a fix; the user decides.
+- its last two lines verbatim: the result line (`success:` or `error:`, or
+  `warning:` for a final `WAITING`), then the outcome line (`READY`, `STOPPED`, or
+  a final `WAITING`);
+- if a `--- failure` block precedes those two lines, the block verbatim (it holds
+  the failed verify output or the failed CI checks and their logs), followed by
+  one sentence naming the most likely cause. Do not attempt a fix; the user decides.

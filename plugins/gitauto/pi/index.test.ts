@@ -96,6 +96,7 @@ test("/gitauto:branch-out names the branch with the model and creates it", async
   assert.equal(git(repo, "branch", "--show-current"), "feat/pi-e2e");
   assert.match(pi.prompts[0], /^NEED_NAME on=main/);
   assert.match(pi.messages[0], /DONE state=created branch=feat\/pi-e2e from=main/);
+  assert.match(pi.messages[0], /^\*\*\/gitauto:branch-out\*\*\n\nsuccess: created feat\/pi-e2e from main and switched to it\n\n```text\n/);
   assert.deepEqual(pi.models, ["fake/model"], "no cheap model available: the session's model");
 });
 
@@ -175,6 +176,7 @@ test("/gitauto:ship ships a small change end to end with the cheap writer", asyn
   const pi = load(repo, reply);
   await pi.run("gitauto:ship", "no tag");
   assert.match(pi.messages[0], /SHIPPED pr=#7 .* tag=declined /);
+  assert.match(pi.messages[0], /^\*\*\/gitauto:ship\*\*\n\nsuccess: ship finished: PR #7 merged, main synced, branch cleaned up\n\n```text\n/);
   assert.equal(git(repo, "branch", "--show-current"), "main");
   assert.equal(git(repo, "log", "-1", "--format=%s", "feat/pi-ship"), "feat(readme): add a change");
   assert.equal(readFileSync(join(gh, "title"), "utf8"), "Add a change");
@@ -187,7 +189,7 @@ test("a model reply without a requested text stops before any mutation", async (
   writeFileSync(join(repo, "README.md"), "base\nchange\n");
   const pi = load(repo, "=== branch\nfeat/half");
   await pi.run("gitauto:ship");
-  assert.match(pi.messages[0], /failed: the model did not write a title/);
+  assert.match(pi.messages[0], /\n\nerror: the model did not write a title$/);
   assert.equal(git(repo, "branch", "--show-current"), "main");
 });
 
