@@ -1,8 +1,10 @@
 // The gitauto flows for pi, harness-free: every side effect comes in through
 // Deps, so the flows can be tested with fakes. The scripts decide; this code only
-// runs them, asks a model for the texts they list, and asks the user about tags.
+// runs them, asks a model for the texts they list, and asks the user which gh
+// account to use and whether to tag.
 import {
   NO_TAG,
+  accountQuestion,
   failureBlock,
   firstLine,
   lastLine,
@@ -59,6 +61,11 @@ export async function branchOut(deps: Deps, args: string): Promise<string> {
 export async function ship(deps: Deps, args: string, until: "ship" | "pr"): Promise<string> {
   const prepareArgs = until === "pr" ? ["prepare", "--for", "pr", args] : ["prepare", args];
   let pre = await deps.script("ship.sh", prepareArgs);
+  if (pre.out.startsWith("NEED_ACCOUNT")) {
+    const stop = await pickAccount(deps, firstLine(pre.out));
+    if (stop) return stop;
+    pre = await deps.script("ship.sh", prepareArgs);
+  }
   if (!pre.out.startsWith("SHIP")) return code(firstLine(pre.out));
   const fields = parseFields(firstLine(pre.out));
   const notes: string[] = [];
@@ -121,6 +128,18 @@ function textFlags(texts: Texts): string[] {
   if (texts.message) flags.push("--message", texts.message);
   if (texts.body) flags.push("--body-stdin");
   return flags;
+}
+
+/** Ask which gh account to use and save it. Returns a report when the flow must stop. */
+async function pickAccount(deps: Deps, line: string): Promise<string | undefined> {
+  const q = accountQuestion(parseFields(line));
+  const choice = await deps.select(q.title, q.options);
+  if (!choice || !q.options.includes(choice)) {
+    return [code(line), "No GitHub account chosen, so nothing was shipped."].join("\n\n");
+  }
+  deps.progress(`using the ${choice} account`);
+  const saved = await deps.script("ship.sh", ["account", choice]);
+  return firstLine(saved.out).startsWith("DONE state=saved") ? undefined : code(firstLine(saved.out));
 }
 
 /** Ask once; tag only an explicitly chosen version. Returns the tag line, if any. */

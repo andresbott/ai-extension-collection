@@ -1,8 +1,25 @@
 #!/usr/bin/env bash
-# `ssh -G <host>` for tests: work-alias is an SSH config alias for github.com;
-# any other host resolves to itself.
-[[ "${1:-}" == -G ]] || { printf 'fake ssh: unsupported %s\n' "$*" >&2; exit 9; }
-case "${2:-}" in
-  work-alias) printf 'host work-alias\nuser git\nhostname github.com\nport 22\n' ;;
-  *) printf 'host %s\nuser git\nhostname %s\nport 22\n' "${2:-}" "${2:-}" ;;
-esac
+# Fake ssh for tests.
+# `ssh -G <host>`: work-alias is an SSH config alias for github.com; any other
+# host resolves to itself.
+# `ssh -T ... <target>`: GitHub's greeting for $FAKE_SSH_LOGIN (exit 1, like
+# GitHub), or a refused key when it is unset. Each -T call is logged to
+# $FAKE_SSH_LOG when set.
+if [[ "${1:-}" == -G ]]; then
+  case "${2:-}" in
+    work-alias) printf 'host work-alias\nuser git\nhostname github.com\nport 22\n' ;;
+    *) printf 'host %s\nuser git\nhostname %s\nport 22\n' "${2:-}" "${2:-}" ;;
+  esac
+  exit 0
+fi
+if [[ "${1:-}" == -T ]]; then
+  [[ -z "${FAKE_SSH_LOG:-}" ]] || printf '%s\n' "$*" >> "$FAKE_SSH_LOG"
+  if [[ -n "${FAKE_SSH_LOGIN:-}" ]]; then
+    printf "Hi %s! You've successfully authenticated, but GitHub does not provide shell access.\n" "$FAKE_SSH_LOGIN" >&2
+    exit 1
+  fi
+  printf 'git@github.com: Permission denied (publickey).\n' >&2
+  exit 255
+fi
+printf 'fake ssh: unsupported %s\n' "$*" >&2
+exit 9

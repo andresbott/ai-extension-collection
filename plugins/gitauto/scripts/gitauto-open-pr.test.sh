@@ -89,6 +89,7 @@ output="$( (cd "$repo" && PATH="$bin:$PATH" GH_LOG="$log" GH_SCENARIO=error EXPE
 status=$?
 set -e
 [[ $status -ne 0 && "$output" == *'state=failed'* ]] || fail "lookup error was not preserved: status=$status output=$output"
+[[ "$output" == *'report=pull request lookup failed: network unavailable'* ]] || fail "gh's error is not reported: $output"
 ! grep -q '^pr create$' "$log" || fail "lookup error attempted PR creation"
 printf 'PASS: PR lookup failure does not become confirmed absence\n'
 

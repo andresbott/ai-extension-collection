@@ -11,6 +11,11 @@ import { fileURLToPath } from "node:url";
 import gitauto from "./index.ts";
 
 const FAKE_GH = join(dirname(dirname(fileURLToPath(import.meta.url))), "scripts", "testdata", "fake-gh");
+const FAKE_SSH = join(dirname(FAKE_GH), "fake-ssh");
+// The account tests need gitauto to pick the gh account itself.
+for (const name of ["GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN", "FAKE_SSH_LOGIN"]) {
+  delete process.env[name];
+}
 
 function git(cwd: string, ...args: string[]) {
   return execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
@@ -184,4 +189,27 @@ test("a model reply without a requested text stops before any mutation", async (
   await pi.run("gitauto:ship");
   assert.match(pi.messages[0], /failed: the model did not write a title/);
   assert.equal(git(repo, "branch", "--show-current"), "main");
+});
+
+test("/gitauto:open-pr asks which gh account to use and opens the PR with it", async () => {
+  const { repo, gh } = fixture(true);
+  // GitHub's URL for the account check; pushes still go to the local bare remote.
+  const remote = git(repo, "remote", "get-url", "origin");
+  git(repo, "remote", "set-url", "origin", "git@github.com:o/r.git");
+  git(repo, "remote", "set-url", "--push", "origin", remote);
+  const bin = dirname(execFileSync("bash", ["-c", "command -v gh"], { encoding: "utf8" }).trim());
+  copyFileSync(FAKE_SSH, join(bin, "ssh"));
+  execFileSync("chmod", ["+x", join(bin, "ssh")]);
+  writeFileSync(join(gh, "logins"), "a b");
+  writeFileSync(join(gh, "push"), "a b");
+  git(repo, "switch", "-qc", "feat/pi-account");
+  writeFileSync(join(repo, "README.md"), "base\naccount\n");
+  const reply = ["=== title", "Pick an account", "=== subject", "feat: pick an account", "=== body", "## Summary", "Why."].join("\n");
+  const pi = load(repo, reply, "b");
+  await pi.run("gitauto:open-pr");
+  assert.match(pi.messages[0], /READY pr=#7 /);
+  const config = JSON.parse(readFileSync(join(repo, ".git", "gitauto.json"), "utf8"));
+  assert.equal(config.account, "b");
+  assert.equal(config.source, "asked");
+  assert.match(readFileSync(join(gh, "tokens"), "utf8"), /^tok-b\tpr create /m);
 });

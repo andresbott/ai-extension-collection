@@ -106,6 +106,14 @@ export function parseShipArgs(args: string): ShipOptions {
 
 export const NO_TAG = "No tag";
 
+/** The account question for a `NEED_ACCOUNT` line: one option per account that can push. */
+export function accountQuestion(fields: Record<string, string>) {
+  return {
+    title: `Several GitHub accounts can push to ${fields.repo ?? "this repo"}. Which one should gitauto use? (saved for this clone)`,
+    options: (fields.accounts ?? "").split(",").filter(Boolean),
+  };
+}
+
 /** The release-tag question for a `tag=ask` line: "No tag" first, suggestion marked. */
 export function tagQuestion(fields: Record<string, string>) {
   const versions = (fields.tag_options ?? "").split(",").filter(Boolean);

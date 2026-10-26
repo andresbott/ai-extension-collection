@@ -40,7 +40,7 @@ if [[ $view_status -ne 0 ]]; then
   if printf '%s' "$view" | grep -qiE 'no pull requests found|could not resolve to a PullRequest'; then
     view=''
   else
-    printf 'state=failed\nnumber=\nurl=\nbranch=%s\nreport=pull request lookup failed\n' "$branch"
+    printf 'state=failed\nnumber=\nurl=\nbranch=%s\nreport=pull request lookup failed: %s\n' "$branch" "$(gitauto_gh_error "$view")"
     exit 2
   fi
 fi

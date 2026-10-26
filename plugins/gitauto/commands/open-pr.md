@@ -2,11 +2,21 @@
 description: Open (or reuse) a PR for the current work and wait until CI is green — branch, verify, commit, push, open PR, watch CI. Does not merge; run /gitauto:ship afterwards to land it.
 argument-hint: "[branch name]"
 model: haiku
-allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/scripts/ship.sh:*), Agent
+allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/scripts/ship.sh:*), Agent, AskUserQuestion
 ---
 !`${CLAUDE_PLUGIN_ROOT}/scripts/ship.sh prepare --for pr '$ARGUMENTS'`
 
-If the output above starts with `DONE`, reply with that line verbatim. Call no tools.
+If the output above starts with `NEED_ACCOUNT`, several GitHub accounts can push
+to this repo. Call AskUserQuestion once: "Which GitHub account should gitauto use
+for <repo>? It is saved for this clone.", with one option per login in
+`accounts`. If the user picks one, run
+`${CLAUDE_PLUGIN_ROOT}/scripts/ship.sh account '<login>'`. If that prints
+`DONE state=saved`, run `${CLAUDE_PLUGIN_ROOT}/scripts/ship.sh prepare --for pr '$ARGUMENTS'`
+and use its output in place of the output above from here on. With no pick,
+reply with the `NEED_ACCOUNT` line verbatim; on any other `account` output, reply
+with that line verbatim. Then stop.
+
+If the output starts with `DONE`, reply with that line verbatim. Call no tools.
 
 Otherwise read the `SHIP` line and prepare the text:
 

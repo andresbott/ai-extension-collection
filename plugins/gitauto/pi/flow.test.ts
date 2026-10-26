@@ -199,3 +199,45 @@ test("open-pr prepares --for pr, runs open-pr without tag flags, and hints at sh
   assert.match(report, /READY pr=#7/);
   assert.match(report, /Run `\/gitauto:ship` to merge\./);
 });
+
+const needAccount = "NEED_ACCOUNT host=github.com repo=o/r accounts=a,b report=several gh accounts can push to o/r; choose one";
+
+test("NEED_ACCOUNT asks once, saves the pick, and prepares again before running", async () => {
+  const f = fake(
+    {
+      prepare: [needAccount, nonePrepare],
+      account: ["DONE state=saved account=b host=github.com repo=o/r report=b chosen for o/r"],
+      "open-pr": ["READY pr=#7 url=u ci=green log=/x"],
+    },
+    { choice: "b" },
+  );
+  const report = await ship(f.deps, "", "pr");
+  assert.deepEqual(f.asked[0].options, ["a", "b"]);
+  assert.match(f.asked[0].title, /o\/r/);
+  assert.deepEqual(
+    f.calls.map((c) => c.args[0]),
+    ["prepare", "account", "prepare", "open-pr"],
+  );
+  assert.deepEqual(f.calls[1].args, ["account", "b"]);
+  assert.deepEqual(f.calls[2].args, ["prepare", "--for", "pr", ""]);
+  assert.match(report, /READY pr=#7/);
+});
+
+test("NEED_ACCOUNT without a pick stops before saving or running anything", async () => {
+  const f = fake({ prepare: [needAccount] });
+  const report = await ship(f.deps, "", "ship");
+  assert.equal(f.asked.length, 1);
+  assert.deepEqual(f.calls.map((c) => c.args[0]), ["prepare"]);
+  assert.match(report, /NEED_ACCOUNT host=github.com/);
+  assert.match(report, /No GitHub account chosen/);
+});
+
+test("a refused account pick reports the script's line and stops", async () => {
+  const f = fake(
+    { prepare: [needAccount], account: ["DONE state=failed report=b cannot push to o/r"] },
+    { choice: "b" },
+  );
+  const report = await ship(f.deps, "", "ship");
+  assert.deepEqual(f.calls.map((c) => c.args[0]), ["prepare", "account"]);
+  assert.match(report, /DONE state=failed report=b cannot push to o\/r/);
+});

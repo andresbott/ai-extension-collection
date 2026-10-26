@@ -6,7 +6,17 @@ allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/scripts/ship.sh:*), Agent, AskUserQues
 ---
 !`${CLAUDE_PLUGIN_ROOT}/scripts/ship.sh prepare '$ARGUMENTS'`
 
-If the output above starts with `DONE`, reply with that line verbatim. Call no tools.
+If the output above starts with `NEED_ACCOUNT`, several GitHub accounts can push
+to this repo. Call AskUserQuestion once: "Which GitHub account should gitauto use
+for <repo>? It is saved for this clone.", with one option per login in
+`accounts`. If the user picks one, run
+`${CLAUDE_PLUGIN_ROOT}/scripts/ship.sh account '<login>'`. If that prints
+`DONE state=saved`, run `${CLAUDE_PLUGIN_ROOT}/scripts/ship.sh prepare '$ARGUMENTS'`
+and use its output in place of the output above from here on. With no pick,
+reply with the `NEED_ACCOUNT` line verbatim; on any other `account` output, reply
+with that line verbatim. Then stop.
+
+If the output starts with `DONE`, reply with that line verbatim. Call no tools.
 
 Otherwise read the `SHIP` line and prepare the text:
 

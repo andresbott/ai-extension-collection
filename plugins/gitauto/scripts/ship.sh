@@ -10,9 +10,15 @@
 #                                 wait-ci → merge → sync-main → cleanup → tag check
 #   ship.sh open-pr [same flags]  run --until pr: stop once CI is green (READY)
 #   ship.sh tag <version>         create a release tag the user explicitly chose
+#   ship.sh account <login>       save the gh account the user picked for this clone
 #
 # Without --tag, run never tags: when the repo has a `make tag` target it ends with
 # tag=ask tag_recommended=... tag_options=... so the command can ask the user.
+#
+# prepare first picks the gh account for this clone (gitauto-account.sh). When
+# several accounts can push to the repo it prints `NEED_ACCOUNT ... accounts=a,b`
+# and stops: the command asks the user, runs `ship.sh account <login>`, and runs
+# prepare again. Every later step uses the saved account through its token.
 #
 # prepare prints `DONE ...` (nothing for the model to do) or a `SHIP ...` context
 # block. Its `--- write` block lists each text the model must write, with its
@@ -62,6 +68,23 @@ is_cc() {
 SUBJECT_TAG='gitauto-subject'
 saved_subject() { sed -n "s/^<!-- $SUBJECT_TAG: \(.*\) -->\$/\1/p" <<< "$1" | tail -n 1; }
 
+# The gh account for origin (see gitauto-account.sh): sets account_state and
+# account_out, and on a resolved account points every later gh call at it.
+account_state=''; account_out=''
+resolve_account() {
+  account_out="$("$D/gitauto-account.sh" remote=origin "$@" 2>&1)"
+  account_state="$(acct state)"
+  if [[ -z "$account_state" ]]; then
+    account_state=failed
+    account_out+=$'\n'"report=the gh account could not be resolved: $(gitauto_gh_error "$account_out")"
+  elif [[ "$account_state" == resolved && -n "$(acct account)" ]] &&
+     ! gitauto_export_account "$(acct host)" "$(acct account)"; then
+    account_state=failed
+    account_out+=$'\n'"report=gh has no token for $(acct account) on $(acct host)"
+  fi
+}
+acct() { sed -n "s/^$1=//p" <<< "$account_out" | tail -n 1; }
+
 prepare() {
   local for=ship
   if [[ "${1:-}" == --for ]]; then for="${2:-ship}"; shift 2; fi
@@ -71,14 +94,38 @@ prepare() {
   git remote get-url origin >/dev/null 2>&1 || fail "no origin remote"
   gitauto_remote_default_unresolved origin && fail "default branch could not be resolved safely"
   gitauto_gh_authenticated origin || fail "GitHub CLI is unavailable or unauthenticated"
+  # First, so a question about the account comes before any slow work.
+  resolve_account
+  case "$account_state" in
+    resolved|skip) ;;
+    ask)
+      printf 'NEED_ACCOUNT host=%s repo=%s accounts=%s report=%s\n' \
+        "$(acct host)" "$(acct repo)" "$(acct accounts)" "$(acct report)"
+      exit 0 ;;
+    *) fail "$(acct report)" ;;
+  esac
   base="$(gitauto_resolve_default_branch origin)"
   rm -rf "$draft_dir"
 
   if gitauto_is_protected_branch "$current" origin; then
     protected=yes
   else
-    pr="$(gh pr view "$current" --json number,state,title \
-      --jq '"\(.state|ascii_downcase)#\(.number) \(.title)"' 2>/dev/null)" || pr=none
+    # Only gh's "no pull requests" means there is none; any other error (an
+    # account that cannot see the repo, a network failure) stops here, before
+    # verify and push, with gh's own message.
+    local err
+    err="$(mktemp "${TMPDIR:-/tmp}/gitauto-gh.XXXXXX")"
+    if ! pr="$(gh pr view "$current" --json number,state,title \
+        --jq '"\(.state|ascii_downcase)#\(.number) \(.title)"' 2>"$err")"; then
+      if grep -qiE 'no pull requests found|could not resolve to a PullRequest' "$err"; then
+        pr=none
+      else
+        local why
+        why="$(gitauto_gh_error "$(cat "$err")")"; rm -f "$err"
+        fail "pull request lookup failed: $why"
+      fi
+    fi
+    rm -f "$err"
     [[ -n "$pr" ]] || pr=none
   fi
 
@@ -244,6 +291,15 @@ run() {
       done
   }
 
+  # The account prepare picked (saved for this clone), so no question here.
+  resolve_account
+  printf '\n== account\n%s\n' "$account_out" >> "$log"
+  case "$account_state" in
+    resolved|skip) ;;
+    ask) st=ask; stop account "several gh accounts can push to $(acct repo) ($(acct accounts)); run ship.sh prepare to choose one" ;;
+    *) st=failed; stop account "$(acct report)" ;;
+  esac
+
   # branch
   branch="$(git branch --show-current)"
   if [[ -z "$branch" ]] || gitauto_is_protected_branch "$branch" origin; then
@@ -406,6 +462,16 @@ tag_cmd() {
   fi
 }
 
+# Save the gh account the user picked after a NEED_ACCOUNT line.
+account_cmd() {
+  local login="${1:-}"
+  [[ -n "$login" ]] || fail "usage: ship.sh account <login>"
+  resolve_account "choose=$login"
+  [[ "$account_state" == resolved ]] || fail "$(acct report)"
+  printf 'DONE state=saved account=%s host=%s repo=%s report=%s\n' \
+    "$(acct account)" "$(acct host)" "$(acct repo)" "$(acct report)"
+}
+
 cmd="${1:-}"; shift || true
 case "$cmd" in
   prepare) prepare "$@" ;;
@@ -413,5 +479,6 @@ case "$cmd" in
   run) run "$@" ;;
   open-pr) run --until pr "$@" ;;
   tag) tag_cmd "$@" ;;
-  *) fail "usage: ship.sh prepare|draft|run|open-pr|tag" ;;
+  account) account_cmd "$@" ;;
+  *) fail "usage: ship.sh prepare|draft|run|open-pr|tag|account" ;;
 esac

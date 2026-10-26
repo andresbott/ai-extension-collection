@@ -8,6 +8,9 @@ roots=()
 trap 'rm -rf "${roots[@]}"' EXIT
 fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$*"; }
+unset GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN GIT_SSH_COMMAND GIT_SSH FAKE_SSH_LOGIN
+# A global url.<x>.insteadOf would rewrite the fixture remotes.
+export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 
 fixture() {
   root="$(mktemp -d)"; roots+=("$root")
@@ -248,6 +251,52 @@ out="$(ship run --title 'Fine title' --subject 'not conventional' --body-stdin <
 grep -q '^DONE state=failed report=--subject must be' <<<"$out" || fail "bad subject: $out"
 [[ -n "$(git -C "$repo" status --porcelain)" ]] || fail "nothing should be committed"
 pass "an invalid subject fails before any mutation"
+
+# Several gh accounts on github.com. The fetch URL is GitHub's, so the account
+# check runs; pushes still go to the local bare remote.
+github_fixture() {
+  fixture
+  cp "$TESTDATA/fake-ssh" "$bin/ssh"; chmod +x "$bin/ssh"
+  git -C "$repo" remote set-url origin git@github.com:o/r.git
+  git -C "$repo" remote set-url --push origin "$remote"
+  printf 'a b' > "$FAKE_GH/logins"; printf 'a b' > "$FAKE_GH/push"
+}
+github_fixture
+git -C "$repo" switch -qc feat/account
+printf 'account\n' >> "$repo/README.md"
+out="$(ship prepare '')"
+[[ "$out" == 'NEED_ACCOUNT host=github.com repo=o/r accounts=a,b report=several gh accounts can push to o/r; choose one' ]] ||
+  fail "ask: $out"
+! grep -q '^pr view' "$FAKE_GH/log" || fail "the account question must come before the PR lookup"
+out="$(ship account c)"
+[[ "$out" == 'DONE state=failed report=c is not logged in to gh on github.com (logged in: a,b)' ]] || fail "unknown pick: $out"
+out="$(ship account b)"
+[[ "$out" == 'DONE state=saved account=b host=github.com repo=o/r report=b chosen for o/r' ]] || fail "pick: $out"
+out="$(ship prepare '')"
+grep -q '^SHIP branch=feat/account .* need=pr writer=cheap$' <<<"$out" || fail "prepare after the pick: $out"
+grep -q $'^tok-b\tpr view feat/account ' "$FAKE_GH/tokens" || fail "PR lookup without b's token: $(cat "$FAKE_GH/tokens")"
+out="$(ship open-pr --title 'feat: account' --body-stdin <<<'body')"
+grep -q '^READY pr=#7 ' <<<"$out" || fail "open-pr as b: $out"
+grep -q $'^tok-b\tpr create ' "$FAKE_GH/tokens" || fail "PR created without b's token: $(cat "$FAKE_GH/tokens")"
+pass "with several gh accounts, prepare asks first and every gh call uses the picked one"
+
+rm "$repo/.git/gitauto.json"
+out="$(ship run)"
+grep -q '^STOPPED stage=account state=ask report=several gh accounts can push to o/r (a,b); run ship.sh prepare to choose one ' <<<"$out" ||
+  fail "run without a pick: $out"
+out="$(FAKE_SSH_LOGIN=a ship prepare '')"
+grep -q '^SHIP ' <<<"$out" || fail "the SSH key should decide: $out"
+[[ "$(jq -r .account "$repo/.git/gitauto.json")" == a ]] || fail "the SSH pick was not saved"
+pass "run never asks; the SSH key's account is picked without a question"
+
+fixture
+git -C "$repo" switch -qc feat/hidden
+printf 'hidden\n' >> "$repo/README.md"
+touch "$FAKE_GH/prerror"
+out="$(ship prepare '')"
+[[ "$out" == "DONE state=failed report=pull request lookup failed: GraphQL: Could not resolve to a Repository with the name 'o/r'. (repository)" ]] ||
+  fail "lookup error: $out"
+pass "a PR lookup error stops prepare with gh's message instead of reading as no PR"
 
 fixture
 cp "$TESTDATA/fake-ssh" "$bin/ssh"; chmod +x "$bin/ssh"
