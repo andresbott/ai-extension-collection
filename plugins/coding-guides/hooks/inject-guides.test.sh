@@ -95,7 +95,7 @@ if (( have_jq )); then
   injected "SubagentStart: injects into a plugin agent" SubagentStart
   run "$PATH" SubagentStart "$(subagent_payload Explorer)"
   injected "SubagentStart: skip list matches whole names only" SubagentStart
-  for agent in Explore Plan claude-code-guide statusline-setup; do
+  for agent in Explore Plan claude-code-guide statusline-setup gitauto:pr-writer; do
     run "$PATH" SubagentStart "$(subagent_payload "$agent")"
     nothing "SubagentStart: skips $agent"
   done

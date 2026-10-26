@@ -3,7 +3,7 @@
 // pi: the bundled scripts, nested model calls, the account and tag questions,
 // and progress.
 //
-// Models, as in Claude Code (haiku for the command, opus for pr-writer):
+// Models, as in Claude Code (haiku for the command, sonnet for pr-writer):
 // - simple texts (branch names, messages, small PR texts, failure diagnosis) use
 //   a cheap model picked by ./models.ts, falling back to the session's model;
 // - complex PR titles and bodies, written by the pr-writer expert, use the
