@@ -15,7 +15,7 @@ and [pi package](https://pi.dev/packages) of reusable extensions.
 | `session-sounds` | Hooks | ✅ | ❌ | Plays a bundled sound (via `paplay`) when Claude finishes responding and on notifications. |
 | `pi-clear` | pi extension | ❌ | ✅ | `/clear` hides earlier conversation from the model while keeping the session. |
 | `pi-clear-on-exit` | pi extension | ❌ | ✅ | Clears the terminal and its scrollback when interactive pi exits. |
-| `pi-context` | pi extension | ❌ | ✅ | `/context` shows used, free, and total context-window tokens. |
+| `pi-context` | pi extension | ❌ | ✅ | `/context` shows a Claude-Code-style breakdown of context usage: grid, categories, and per-item lists. |
 | `pi-rename` | pi extension | ❌ | ✅ | `/rename "title"` names the session verbatim; bare `/rename` has Sonnet (or the session model) generate a name. |
 | `pi-render-mode` | pi extension (WIP) | ❌ | 🚧 | Work in progress, not in the pi package yet: `ctrl+r` switches rendering between normal, verbose, and minimal. |
 | `pi-startup-splash` | pi extension | ❌ | ✅ | A startup splash with the model, cwd, context, skills, prompts, and extensions. |

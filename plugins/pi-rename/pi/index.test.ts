@@ -6,13 +6,13 @@ import piRename from "./index.ts";
 // A minimal stand-in for the slice of Pi's ExtensionAPI the extension uses.
 function makeFakePi() {
   const commands = new Map();
-  const names = [];
+  const names: string[] = [];
   const handlers = new Map();
   const pi = {
-    registerCommand: (name, opts) => commands.set(name, opts),
-    setSessionName: (name) => names.push(name),
-    on: (event, handler) => handlers.set(event, handler),
-  };
+    registerCommand: (name: string, opts: unknown) => commands.set(name, opts),
+    setSessionName: (name: string) => names.push(name),
+    on: (event: string, handler: unknown) => handlers.set(event, handler),
+  } as any;
   return { pi, commands, names, handlers };
 }
 
@@ -21,9 +21,18 @@ const conversation = [
   { type: "message", message: { role: "assistant", content: [{ type: "text", text: "Done." }] } },
 ];
 
-function makeCtx({ entries = conversation, reply, auth = true, model = { provider: "p", id: "m" }, available = [], fail } = {}) {
-  const notes = [];
-  const calls = [];
+interface CtxOptions {
+  entries?: unknown[];
+  reply?: unknown;
+  auth?: boolean;
+  model?: { provider: string; id: string } | null;
+  available?: { provider: string; id: string }[];
+  fail?: string;
+}
+
+function makeCtx({ entries = conversation, reply, auth = true, model = { provider: "p", id: "m" }, available = [], fail }: CtxOptions = {}) {
+  const notes: { message: string; level: string }[] = [];
+  const calls: { model: unknown; context: any; options: any }[] = [];
   const ctx = {
     model,
     signal: undefined,
@@ -31,7 +40,7 @@ function makeCtx({ entries = conversation, reply, auth = true, model = { provide
     modelRegistry: {
       getAvailable: () => available,
       hasConfiguredAuth: () => auth,
-      streamSimple: (m, context, options) => {
+      streamSimple: (m: unknown, context: unknown, options: unknown) => {
         calls.push({ model: m, context, options });
         return {
           result: async () => {
@@ -41,7 +50,7 @@ function makeCtx({ entries = conversation, reply, auth = true, model = { provide
         };
       },
     },
-    ui: { notify: (message, level) => notes.push({ message, level }) },
+    ui: { notify: (message: string, level: string) => notes.push({ message, level }) },
   };
   return { ctx, notes, calls };
 }
@@ -63,7 +72,7 @@ test('/rename "title" sets the title verbatim without calling a model', async ()
 
   assert.deepEqual(names, ["My exact Title."]);
   assert.equal(calls.length, 0, "no model call for a typed title");
-  assert.match(notes.at(-1).message, /Session named: My exact Title\./);
+  assert.match(notes.at(-1)?.message ?? "", /Session named: My exact Title\./);
 });
 
 test("bare /rename falls back to the session model when no Sonnet is available", async () => {
@@ -80,7 +89,7 @@ test("bare /rename falls back to the session model when no Sonnet is available",
   assert.equal(typeof calls[0].options.sessionId, "string");
   const prompt = calls[0].context.messages[0].content[0].text;
   assert.match(prompt, /User: add a \/rename command to pi/);
-  assert.match(notes.at(-1).message, /Session named: Add Rename Command/);
+  assert.match(notes.at(-1)?.message ?? "", /Session named: Add Rename Command/);
 });
 
 test("bare /rename names with the newest Sonnet, preferring the session's provider", async () => {
@@ -123,7 +132,7 @@ test("bare /rename on an empty session warns and names nothing", async () => {
 
   assert.deepEqual(names, []);
   assert.equal(calls.length, 0);
-  assert.equal(notes.at(-1).level, "warning");
+  assert.equal(notes.at(-1)?.level, "warning");
 });
 
 test("bare /rename without a usable model warns and names nothing", async () => {
@@ -137,7 +146,7 @@ test("bare /rename without a usable model warns and names nothing", async () => 
 
     assert.deepEqual(names, []);
     assert.equal(calls.length, 0);
-    assert.equal(notes.at(-1).level, "warning");
+    assert.equal(notes.at(-1)?.level, "warning");
   }
 });
 
@@ -155,7 +164,7 @@ test("a failed model call reports an error and keeps the old name", async () => 
     await commands.get("rename").handler("", ctx);
 
     assert.deepEqual(names, []);
-    assert.equal(notes.at(-1).level, "error");
+    assert.equal(notes.at(-1)?.level, "error");
   }
 });
 
@@ -167,5 +176,5 @@ test("an empty model reply warns and names nothing", async () => {
   await commands.get("rename").handler("", ctx);
 
   assert.deepEqual(names, []);
-  assert.equal(notes.at(-1).level, "warning");
+  assert.equal(notes.at(-1)?.level, "warning");
 });
