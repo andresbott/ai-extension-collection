@@ -37,6 +37,8 @@ case "${1:-} ${2:-}" in
     esac
     ;;
   'pr create')
+    # GH_CREATE_ERROR: gh refuses to create the PR with this message.
+    [[ -z "${GH_CREATE_ERROR:-}" ]] || { printf '%s\n' "$GH_CREATE_ERROR" >&2; exit 1; }
     shift 2
     base=''; head=''; title=''; body=''
     while (($#)); do
@@ -89,6 +91,7 @@ output="$( (cd "$repo" && PATH="$bin:$PATH" GH_LOG="$log" GH_SCENARIO=error EXPE
 status=$?
 set -e
 [[ $status -ne 0 && "$output" == *'state=failed'* ]] || fail "lookup error was not preserved: status=$status output=$output"
+[[ "$output" == *'report=pull request lookup failed: network unavailable'* ]] || fail "gh's error is not reported: $output"
 ! grep -q '^pr create$' "$log" || fail "lookup error attempted PR creation"
 printf 'PASS: PR lookup failure does not become confirmed absence\n'
 
@@ -98,6 +101,18 @@ output="$( (cd "$repo" && PATH="$bin:$PATH" GH_LOG="$log" GH_SCENARIO=none EXPEC
 [[ "$output" == *'state=created'* && "$output" == *'number=77'* ]] || fail "created PR outcome missing: $output"
 grep -q '^pr create$' "$log" || fail "gh pr create was not called"
 printf 'PASS: missing PR is created with exact arguments\n'
+
+new_fixture feat/refused
+set +e
+output="$( (cd "$repo" && PATH="$bin:$PATH" GH_LOG="$log" GH_SCENARIO=none \
+  GH_CREATE_ERROR='pull request create failed: GraphQL: Unauthorized: As an Enterprise Managed User, you cannot access this content (createPullRequest)' \
+  "$OPEN_PR_SCRIPT" 'title=x' 'body=y' 'base=main') 2>/dev/null)"
+status=$?
+set -e
+[[ $status -ne 0 && "$output" == *'state=failed'* ]] || fail "create error was not reported as failed: status=$status output=$output"
+[[ "$output" == *'report=pull request creation failed: GraphQL: Unauthorized: As an Enterprise Managed User, you cannot access this content (createPullRequest)'* ]] ||
+  fail "gh's create error is not reported: $output"
+printf 'PASS: a refused PR creation reports gh'\''s error\n'
 
 new_fixture feat/host
 cp "$SCRIPT_DIR/testdata/fake-ssh" "$bin/ssh"; chmod +x "$bin/ssh"

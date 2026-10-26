@@ -1,15 +1,50 @@
 #!/usr/bin/env bash
+# Fake gh for the ship and pi tests; its state lives in $FAKE_GH. Accounts:
+# `logins` (space-separated, default "tester") are logged in, `push` lists those
+# that can push to the repo, `read` those that can only read it; any other login
+# gets a 404. Each call is logged with its token to `tokens`.
 s="$FAKE_GH"; printf '%s\n' "$*" >> "$s/log"
-json=''; prev=''; for a in "$@"; do [[ "$prev" == --json ]] && json="$a"; prev="$a"; done
+printf '%s\t%s\n' "${GH_TOKEN:-${GH_ENTERPRISE_TOKEN:-}}" "$*" >> "$s/tokens"
+json=''; jq=''; hostname=github.com; user=''; prev=''
+for a in "$@"; do
+  case "$prev" in --json) json="$a" ;; --jq) jq="$a" ;; --hostname) hostname="$a" ;; --user) user="$a" ;; esac
+  prev="$a"
+done
+logins="$(cat "$s/logins" 2>/dev/null || echo tester)"
+has() { [[ " $(cat "$s/$1" 2>/dev/null) " == *" $2 "* ]]; }
 case "${1:-} ${2:-}" in
-  # auth-only: the one host with a working login; a wider check fails.
-  'auth status') [[ ! -f "$s/auth-only" || "$*" == "auth status --hostname $(cat "$s/auth-only")" ]] ;;
+  'auth status')
+    if [[ "$json" == hosts ]]; then
+      [[ ! -f "$s/nojson" ]] || { printf 'unknown flag: --json\n' >&2; exit 1; }
+      entries=''
+      for l in $logins; do entries+="${entries:+,}{\"login\":\"$l\",\"state\":\"success\",\"host\":\"$hostname\"}"; done
+      printf '{"hosts":{"%s":[%s]}}\n' "$hostname" "$entries" | jq -r "${jq:-.}"
+      exit
+    fi
+    # auth-only: the one host with a working login; a wider check fails.
+    [[ ! -f "$s/auth-only" || "$*" == "auth status --hostname $(cat "$s/auth-only")" ]] ;;
+  'auth token') [[ " $logins " == *" $user "* ]] || exit 1; printf 'tok-%s\n' "$user" ;;
+  'api '*)
+    [[ ! -f "$s/apidown" ]] || { printf 'error connecting to api.github.com\n' >&2; exit 1; }
+    login="${GH_TOKEN:-${GH_ENTERPRISE_TOKEN:-}}"; login="${login#tok-}"
+    if has push "$login"; then printf '{"permissions":{"push":true}}\n' | jq -r "${jq:-.}"
+    elif has read "$login"; then printf '{"permissions":{"push":false}}\n' | jq -r "${jq:-.}"
+    else printf '{"message":"Not Found","status":"404"}'; printf 'gh: Not Found (HTTP 404)\n' >&2; exit 1
+    fi ;;
   'repo view') exit 1 ;;
   'pr create')
+    # prcreate-error: gh refuses to create the PR, as for an Enterprise Managed User.
+    if [[ -f "$s/prcreate-error" ]]; then
+      printf 'pull request create failed: GraphQL: Unauthorized: As an Enterprise Managed User, you cannot access this content (createPullRequest)\n' >&2; exit 1
+    fi
     while [[ $# -gt 0 ]]; do case "$1" in --head) printf '%s' "$2" > "$s/head" ;; --title) printf '%s' "$2" > "$s/title" ;; --body) printf '%s' "$2" > "$s/body" ;; esac; shift; done
     git rev-parse HEAD > "$s/oid"
     printf 'https://github.com/o/r/pull/7\n' ;;
   'pr view')
+    # prerror: the active account cannot see the repository.
+    if [[ -f "$s/prerror" ]]; then
+      printf "GraphQL: Could not resolve to a Repository with the name 'o/r'. (repository)\n" >&2; exit 1
+    fi
     [[ -f "$s/head" ]] || { printf 'no pull requests found for branch\n' >&2; exit 1; }
     state="$(cat "$s/state" 2>/dev/null || echo OPEN)"
     case "$json" in

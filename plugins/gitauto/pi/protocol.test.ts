@@ -8,6 +8,7 @@ import {
   parseFields,
   parseShipArgs,
   parseTexts,
+  resultLine,
   stripFrontmatter,
   tagQuestion,
   writeKeys,
@@ -38,11 +39,20 @@ test("writeKeys lists only the keys of the --- write block", () => {
   assert.deepEqual(writeKeys("SHIP need=none"), []);
 });
 
-test("failureBlock is everything from --- failure up to the final line", () => {
-  const out = "ship: [1] verify -> fail\n--- failure: verify\nboom\nSTOPPED stage=verify\n";
+test("failureBlock is everything from --- failure up to the result and final lines", () => {
+  const out = "ship: [1] verify -> fail\n--- failure: verify\nboom\nerror: failed to verify\nSTOPPED stage=verify\n";
   assert.equal(failureBlock(out), "--- failure: verify\nboom");
   assert.equal(lastLine(out), "STOPPED stage=verify");
-  assert.equal(failureBlock("SHIPPED pr=#1"), undefined);
+  assert.equal(failureBlock("success: shipped\nSHIPPED pr=#1"), undefined);
+});
+
+test("resultLine is the success/warning/error line right above the final line", () => {
+  assert.equal(resultLine("ship: [1] push\nerror: failed to push\nSTOPPED stage=push\n"), "error: failed to push");
+  assert.equal(resultLine("warning: CI is still running\nWAITING pr=#7"), "warning: CI is still running");
+  assert.equal(resultLine("success: nothing to ship on main\nDONE state=nothing"), "success: nothing to ship on main");
+  // Only the line right above the final line counts, not an error inside a failure block.
+  assert.equal(resultLine("--- failure: verify\nerror: boom\nnot a result\nSTOPPED stage=verify"), undefined);
+  assert.equal(resultLine("SHIPPED pr=#1"), undefined);
 });
 
 test("parseTexts reads === sections, one-line texts, and branch lists", () => {

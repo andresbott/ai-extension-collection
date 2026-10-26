@@ -70,6 +70,56 @@ gitauto_remote_host() {
   printf '%s\n' "$host"
 }
 
+# The `owner/name` a remote points at, as GitHub names the repository: the URL's
+# last two path segments, without `.git`. Fails for a local-path remote.
+gitauto_remote_repo() {
+  local url path
+  url="$(git remote get-url "${1:-origin}" 2>/dev/null)" || return 1
+  case "$url" in
+    *://*) path="${url#*://}"; path="${path#*/}" ;;
+    *:*) [[ "${url%%:*}" != */* ]] || return 1; path="${url#*:}" ;;
+    *) return 1 ;;
+  esac
+  path="${path%/}"; path="${path%.git}"
+  [[ "$path" == */* ]] || return 1
+  printf '%s/%s\n' "$(basename "$(dirname "$path")")" "$(basename "$path")"
+}
+
+# The environment variable gh reads a token from for a host: GH_TOKEN for
+# github.com and GHE.com tenants, GH_ENTERPRISE_TOKEN for GitHub Enterprise Server.
+gitauto_token_var() {
+  case "$1" in
+    github.com|*.ghe.com) printf 'GH_TOKEN\n' ;;
+    *) printf 'GH_ENTERPRISE_TOKEN\n' ;;
+  esac
+}
+
+# The per-clone gitauto settings (the gh account, see gitauto-account.sh). It
+# lives in the common git dir, so every worktree shares it and git never tracks it.
+gitauto_account_file() {
+  local dir
+  dir="$(git rev-parse --git-common-dir 2>/dev/null)" || return 1
+  printf '%s/gitauto.json\n' "$(cd "$dir" && pwd)"
+}
+
+# Point every later gh call of this process at <account> on <host>, without
+# touching gh's global active account.
+gitauto_export_account() {
+  local host="$1" account="$2" var token
+  var="$(gitauto_token_var "$host")"
+  token="$(gh auth token --hostname "$host" --user "$account" 2>/dev/null)" || return 1
+  [[ -n "$token" ]] || return 1
+  export "$var=$token"
+}
+
+# The one line of a gh error worth reporting: its last non-empty line, trimmed.
+gitauto_gh_error() {
+  local line
+  line="$(printf '%s\n' "$1" | awk 'NF { l = $0 } END { print l }' | tr -s '[:space:]' ' ')"
+  line="${line# }"; line="${line% }"
+  printf '%s\n' "${line:-gh gave no error message}" | cut -c1-300
+}
+
 # gh is installed and logged in to the remote's host. A bare `gh auth status`
 # checks every host gh knows, so a stale login on an unrelated host (another
 # GitHub Enterprise) would block this repo; it is only the fallback when the

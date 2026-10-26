@@ -10,15 +10,25 @@
 #                                 wait-ci → merge → sync-main → cleanup → tag check
 #   ship.sh open-pr [same flags]  run --until pr: stop once CI is green (READY)
 #   ship.sh tag <version>         create a release tag the user explicitly chose
+#   ship.sh account <login>       save the gh account the user picked for this clone
 #
 # Without --tag, run never tags: when the repo has a `make tag` target it ends with
 # tag=ask tag_recommended=... tag_options=... so the command can ask the user.
 #
-# prepare prints `DONE ...` (nothing for the model to do) or a `SHIP ...` context
-# block. Its `--- write` block lists each text the model must write, with its
-# rule (see gitauto_write_rules). run prints one final line: SHIPPED, PARTIAL,
-# STOPPED, or WAITING; the full helper output goes to a log file whose path is on
-# that line.
+# prepare first picks the gh account for this clone (gitauto-account.sh). When
+# several accounts can push to the repo it prints `NEED_ACCOUNT ... accounts=a,b`
+# and stops: the command asks the user, runs `ship.sh account <login>`, and runs
+# prepare again. Every later step uses the saved account through its token.
+#
+# prepare prints a `DONE ...` outcome (nothing for the model to do) or a `SHIP ...`
+# context block. Its `--- write` block lists each text the model must write, with
+# its rule (see gitauto_write_rules). run ends with one outcome line: SHIPPED,
+# PARTIAL, STOPPED, WAITING, or READY; the full helper output goes to a log file
+# whose path is on that line.
+#
+# Every outcome line (DONE, SHIPPED, READY, TAGGED, PARTIAL, WAITING, STOPPED) is
+# the last line of the output, right after a result line that tells people what
+# happened: `success: ...`, `warning: ...`, or `error: ...`.
 #
 # run is built to fit one foreground tool call (Claude Code caps those at 10 min):
 # the CI wait gets whatever remains of GITAUTO_CMD_RUN_BUDGET seconds, and if CI
@@ -41,7 +51,19 @@ FAIL_LINES="${GITAUTO_CMD_FAIL_LINES:-60}"
 RUN_BUDGET="${GITAUTO_CMD_RUN_BUDGET:-540}"
 CI_MIN="${GITAUTO_CMD_CI_MIN:-30}"
 
-fail() { printf 'DONE state=failed report=%s\n' "$*"; exit 2; }
+# The result line for people, printed right before an outcome line.
+result() { printf '%s: %s\n' "$1" "$2"; }
+fail() { result error "$*"; printf 'DONE state=failed report=%s\n' "$*"; exit 2; }
+
+# The last line of log $1, from line $2 on, that is not a `== stage` header, a
+# key=value line, or a hint: the error of a helper that died under `set -e`
+# before it could print a report.
+log_error() {
+  tail -n "+${2:-1}" "$1" | grep -vE '^(== |[a-z_]+=|hint:)' |
+    awk 'NF { l = $0 } END {
+      gsub(/[[:space:]]+/, " ", l); sub(/^ /, "", l); sub(/ $/, "", l); sub(/^(error|fatal): /, "", l)
+      print (l == "" ? "no reason was given; see the log" : substr(l, 1, 300)) }'
+}
 
 git rev-parse --git-dir >/dev/null 2>&1 || fail "not a git repository"
 draft_dir="$(git rev-parse --absolute-git-dir)/gitauto"
@@ -62,6 +84,23 @@ is_cc() {
 SUBJECT_TAG='gitauto-subject'
 saved_subject() { sed -n "s/^<!-- $SUBJECT_TAG: \(.*\) -->\$/\1/p" <<< "$1" | tail -n 1; }
 
+# The gh account for origin (see gitauto-account.sh): sets account_state and
+# account_out, and on a resolved account points every later gh call at it.
+account_state=''; account_out=''
+resolve_account() {
+  account_out="$("$D/gitauto-account.sh" remote=origin "$@" 2>&1)"
+  account_state="$(acct state)"
+  if [[ -z "$account_state" ]]; then
+    account_state=failed
+    account_out+=$'\n'"report=the gh account could not be resolved: $(gitauto_gh_error "$account_out")"
+  elif [[ "$account_state" == resolved && -n "$(acct account)" ]] &&
+     ! gitauto_export_account "$(acct host)" "$(acct account)"; then
+    account_state=failed
+    account_out+=$'\n'"report=gh has no token for $(acct account) on $(acct host)"
+  fi
+}
+acct() { sed -n "s/^$1=//p" <<< "$account_out" | tail -n 1; }
+
 prepare() {
   local for=ship
   if [[ "${1:-}" == --for ]]; then for="${2:-ship}"; shift 2; fi
@@ -71,14 +110,38 @@ prepare() {
   git remote get-url origin >/dev/null 2>&1 || fail "no origin remote"
   gitauto_remote_default_unresolved origin && fail "default branch could not be resolved safely"
   gitauto_gh_authenticated origin || fail "GitHub CLI is unavailable or unauthenticated"
+  # First, so a question about the account comes before any slow work.
+  resolve_account
+  case "$account_state" in
+    resolved|skip) ;;
+    ask)
+      printf 'NEED_ACCOUNT host=%s repo=%s accounts=%s report=%s\n' \
+        "$(acct host)" "$(acct repo)" "$(acct accounts)" "$(acct report)"
+      exit 0 ;;
+    *) fail "$(acct report)" ;;
+  esac
   base="$(gitauto_resolve_default_branch origin)"
   rm -rf "$draft_dir"
 
   if gitauto_is_protected_branch "$current" origin; then
     protected=yes
   else
-    pr="$(gh pr view "$current" --json number,state,title \
-      --jq '"\(.state|ascii_downcase)#\(.number) \(.title)"' 2>/dev/null)" || pr=none
+    # Only gh's "no pull requests" means there is none; any other error (an
+    # account that cannot see the repo, a network failure) stops here, before
+    # verify and push, with gh's own message.
+    local err
+    err="$(mktemp "${TMPDIR:-/tmp}/gitauto-gh.XXXXXX")"
+    if ! pr="$(gh pr view "$current" --json number,state,title \
+        --jq '"\(.state|ascii_downcase)#\(.number) \(.title)"' 2>"$err")"; then
+      if grep -qiE 'no pull requests found|could not resolve to a PullRequest' "$err"; then
+        pr=none
+      else
+        local why
+        why="$(gitauto_gh_error "$(cat "$err")")"; rm -f "$err"
+        fail "pull request lookup failed: $why"
+      fi
+    fi
+    rm -f "$err"
     [[ -n "$pr" ]] || pr=none
   fi
 
@@ -87,6 +150,7 @@ prepare() {
   dirty="$(git status --porcelain | wc -l | tr -d ' ')"
   ahead="$(git rev-list --count "$mb..HEAD" 2>/dev/null || echo 0)"
   if [[ "$dirty" -eq 0 && "$ahead" -eq 0 && "$pr" == none ]]; then
+    result success "nothing to ship on $current"
     printf 'DONE state=nothing branch=%s report=nothing to ship\n' "$current"
     exit 0
   fi
@@ -185,8 +249,8 @@ run() {
     shift
   done
   [[ "$until" == ship || "$until" == pr ]] || fail "--until must be ship or pr"
-  local resume_cmd='ship.sh run'
-  [[ "$until" == pr ]] && resume_cmd='ship.sh open-pr'
+  local resume_cmd='ship.sh run' slash=ship
+  [[ "$until" == pr ]] && { resume_cmd='ship.sh open-pr'; slash=open-pr; }
   if [[ -z "$title" && -f "$draft_dir/title" ]]; then
     title="$(cat "$draft_dir/title")"
     [[ -n "$subject" ]] || subject="$(cat "$draft_dir/subject" 2>/dev/null)"
@@ -201,7 +265,7 @@ run() {
   # Save the subject in the PR body so a later ship, in any session, merges without a model.
   [[ -z "$body" || -z "$subject" ]] || body+=$'\n\n'"<!-- $SUBJECT_TAG: $subject -->"
 
-  local log merged=no out st rc=0 branch number='' url='' worktree='' summary n=0 mark=1
+  local log merged=no out st rc=0 branch number='' url='' worktree='' main='' summary n=0 mark=1 cmd
   log="$(mktemp "${TMPDIR:-/tmp}/gitauto-ship.XXXXXX")"
   printf 'ship: started; live output: tail -f %s\n' "$log"
   begin() { n=$((n + 1)); mark=$(($(wc -l < "$log") + 1)); printf '\n== %s\n' "$1" >> "$log"; printf 'ship: [%s] %s ...\n' "$n" "$1"; }
@@ -213,18 +277,39 @@ run() {
     printf '%s\n' "$out" >> "$log"
     st="$(kv state)"
     [[ "$rc" -eq 124 && -z "$st" ]] && st=timeout
+    # A helper that died before it printed a state.
+    [[ "$rc" -ne 0 && -z "$st" ]] && st=error
     end "$name"
   }
   kv() { printf '%s\n' "$out" | sed -n "s/^$1=//p" | tail -n 1; }
+  # The last step's report, else the last error it logged.
+  why() { local r; r="$(kv report)"; printf '%s' "${r:-$(log_error "$log" "$mark")}"; }
+  # What a stage does, for the result line.
+  stage_action() {
+    case "$1" in
+      account) printf 'pick the gh account' ;;
+      branch) printf 'create a feature branch' ;;
+      verify) printf 'verify the changes' ;;
+      commit) printf 'commit the changes' ;;
+      push) printf 'push the branch' ;;
+      open-pr) printf 'open the pull request' ;;
+      wait-ci) printf 'get CI green' ;;
+      merge) printf 'merge the pull request' ;;
+      sync-main) printf 'sync the default branch' ;;
+      *) printf 'finish %s' "$1" ;;
+    esac
+  }
   stop() {
-    local word='STOPPED'
-    [[ "$merged" == yes ]] && word='PARTIAL'
+    local word='STOPPED' level=error report="${2:-$(why)}" what
+    what="failed to $(stage_action "$1"): $report"
+    if [[ "$merged" == yes ]]; then word='PARTIAL'; level=warning; what="PR #$number merged, but $what"; fi
     case "$1" in
       verify) printf -- '--- failure: verify (last %s lines)\n' "$FAIL_LINES"; tail -n "+$mark" "$log" | tail -n "$FAIL_LINES" ;;
       # Only a red check has logs to show; state=error means gh could not read CI.
       wait-ci) [[ "$st" != failed ]] || ci_failure ;;
     esac
-    printf '%s stage=%s state=%s report=%s%s log=%s\n' "$word" "$1" "${st:-none}" "${2:-$(kv report)}" \
+    result "$level" "$what"
+    printf '%s stage=%s state=%s report=%s%s log=%s\n' "$word" "$1" "${st:-none}" "$report" \
       "${url:+ url=$url}" "$log"
     exit 1
   }
@@ -244,6 +329,15 @@ run() {
       done
   }
 
+  # The account prepare picked (saved for this clone), so no question here.
+  resolve_account
+  printf '\n== account\n%s\n' "$account_out" >> "$log"
+  case "$account_state" in
+    resolved|skip) ;;
+    ask) st=ask; stop account "several gh accounts can push to $(acct repo) ($(acct accounts)); run ship.sh prepare to choose one" ;;
+    *) st=failed; stop account "$(acct report)" ;;
+  esac
+
   # branch
   branch="$(git branch --show-current)"
   if [[ -z "$branch" ]] || gitauto_is_protected_branch "$branch" origin; then
@@ -251,9 +345,9 @@ run() {
     begin branch
     out="$("$D/branch-out.sh" --create "${branches[@]}" 2>> "$log")"
     printf '%s\n' "$out" >> "$log"
-    st="$(sed -n 's/.*state=\([^ ]*\).*/\1/p' <<< "$out")"
+    st="$(sed -n 's/^DONE .*state=\([^ ]*\).*/\1/p' <<< "$out")"; st="${st:-error}"
     end branch
-    [[ "$st" == created ]] || stop branch "${out#*report=}"
+    [[ "$st" == created ]] || stop branch "$(sed -n 's/^DONE .* report=//p' <<< "$out")"
     branch="$(git branch --show-current)"
   fi
 
@@ -263,7 +357,7 @@ run() {
     begin verify; st=skip; printf 'already pushed; verified before push\n' >> "$log"; end verify
   else
     step verify "$D/gitauto-verify.sh"
-    [[ "$st" == pass || "$st" == skip ]] || stop verify "verification failed"
+    [[ "$st" == pass || "$st" == skip ]] || { cmd="$(kv command)"; stop verify "${cmd:-verification} failed"; }
   fi
 
   if [[ -n "$(git status --porcelain)" ]]; then
@@ -303,6 +397,7 @@ run() {
   if [[ "$st" == already-merged ]]; then
     merged=yes
     if [[ "$until" == pr ]]; then
+      result success "PR #$number is already merged; run /gitauto:ship to sync and clean up"
       printf 'READY pr=#%s url=%s state=already-merged report=already merged; run /gitauto:ship to sync and clean up log=%s\n' \
         "$number" "$url" "$log"
       exit 0
@@ -314,7 +409,7 @@ run() {
       resolve_subject
       [[ -n "$subject" ]] || { st=needs-subject; stop merge "PR title is not a Conventional Commit and no subject is saved; re-run with --subject"; }
     fi
-    local budget tmo rounds=0
+    local budget tmo rounds=0 ci
     tmo="$(command -v timeout || command -v gtimeout || true)"
     # A check can register after wait-ci saw the others finish (an Actions run
     # queued behind a fast app check); merge then reports it pending, so wait again.
@@ -329,12 +424,16 @@ run() {
       fi
       if [[ -n "$tmo" && "$rc" -eq 124 ]] || [[ "$st" == pending ]]; then
         printf 'ship: [%s] wait-ci -> still running after %ss\n' "$n" "$budget"
+        result warning "CI is still running on PR #$number; run /gitauto:$slash again to resume"
         printf 'WAITING stage=wait-ci pr=#%s url=%s report=CI still running; re-run %s to resume log=%s\n' \
           "$number" "$url" "$resume_cmd" "$log"
         exit 3
       fi
       [[ "$st" == green || "$st" == none ]] || stop wait-ci
       if [[ "$until" == pr ]]; then
+        ci='CI is green'
+        [[ "$st" == green ]] || ci='no CI checks are configured'
+        result success "PR #$number is ready: $ci; run /gitauto:ship to merge"
         printf 'READY pr=#%s url=%s ci=%s log=%s\n' "$number" "$url" "$st" "$log"
         exit 0
       fi
@@ -348,17 +447,21 @@ run() {
 
   step sync-main "$D/gitauto-sync-main.sh" remote=origin
   [[ "$st" == synced ]] || stop sync-main
-  worktree="$(kv worktree)"
+  worktree="$(kv worktree)"; main="$(kv branch)"
 
   step cleanup "$D/gitauto-cleanup.sh" "branch=$branch" remote=origin "deleteRemote=$delete_remote"
   summary="pr=#$number url=$url sync=synced cleanup=$st remote_branch=$(kv remote_branch) worktree=$(kv worktree)"
-  local final='SHIPPED'
-  [[ "$st" == clean ]] || final='PARTIAL'
+  local final='SHIPPED' tagged='' issues=() landed issue_text
+  [[ "$st" == clean ]] || { final='PARTIAL'; issues+=("cleanup is incomplete: $(why)"); }
 
   if [[ -n "$tag" ]]; then
     step tag "$D/gitauto-tag.sh" "version=$tag" "subject=${subject:-}" remote=origin "worktree=${worktree:-.}"
     summary+=" tag=$st"
-    [[ "$st" == tagged ]] || { final='PARTIAL'; summary+=" tag_report=$(kv report)"; }
+    if [[ "$st" == tagged ]]; then
+      tagged=", tagged $tag"
+    else
+      final='PARTIAL'; summary+=" tag_report=$(kv report)"; issues+=("tag $tag failed: $(why)")
+    fi
   elif [[ "$no_tag" == true ]]; then
     summary+=" tag=declined"
   else
@@ -371,6 +474,13 @@ run() {
     else
       summary+=" tag=skip tag_report=$(kv report | tr ' ' '_')"
     fi
+  fi
+  landed="PR #$number merged, ${main:-the default branch} synced"
+  if [[ "$final" == SHIPPED ]]; then
+    result success "ship finished: $landed, branch cleaned up$tagged"
+  else
+    printf -v issue_text '%s; ' "${issues[@]}"
+    result warning "$landed$tagged, but ${issue_text%; }"
   fi
   printf '%s %s log=%s\n' "$final" "$summary" "$log"
 }
@@ -391,7 +501,7 @@ tag_options() {
 # Create a release tag after a ship, from the primary worktree. Only ever called
 # with a version the user explicitly picked.
 tag_cmd() {
-  local version="${1:-}" primary log out st
+  local version="${1:-}" primary log out st report
   [[ -n "$version" ]] || fail "usage: ship.sh tag <version>"
   primary="$(git worktree list --porcelain | awk '/^worktree / { print substr($0, 10); exit }')"
   log="$(mktemp "${TMPDIR:-/tmp}/gitauto-tag.XXXXXX")"
@@ -399,11 +509,26 @@ tag_cmd() {
   printf '%s\n' "$out" >> "$log"
   st="$(sed -n 's/^state=//p' <<< "$out" | tail -n 1)"
   if [[ "$st" == tagged ]]; then
+    result success "tagged $version"
     printf 'TAGGED version=%s latest=%s log=%s\n' "$version" "$(sed -n 's/^latest=//p' <<< "$out")" "$log"
   else
-    printf 'STOPPED stage=tag state=%s report=%s log=%s\n' "${st:-none}" "$(sed -n 's/^report=//p' <<< "$out")" "$log"
+    report="$(sed -n 's/^report=//p' <<< "$out" | tail -n 1)"
+    [[ -n "$report" ]] || report="$(log_error "$log")"
+    result error "failed to create tag $version: $report"
+    printf 'STOPPED stage=tag state=%s report=%s log=%s\n' "${st:-error}" "$report" "$log"
     exit 1
   fi
+}
+
+# Save the gh account the user picked after a NEED_ACCOUNT line.
+account_cmd() {
+  local login="${1:-}"
+  [[ -n "$login" ]] || fail "usage: ship.sh account <login>"
+  resolve_account "choose=$login"
+  [[ "$account_state" == resolved ]] || fail "$(acct report)"
+  result success "saved $(acct account) as the gh account for $(acct repo)"
+  printf 'DONE state=saved account=%s host=%s repo=%s report=%s\n' \
+    "$(acct account)" "$(acct host)" "$(acct repo)" "$(acct report)"
 }
 
 cmd="${1:-}"; shift || true
@@ -413,5 +538,6 @@ case "$cmd" in
   run) run "$@" ;;
   open-pr) run --until pr "$@" ;;
   tag) tag_cmd "$@" ;;
-  *) fail "usage: ship.sh prepare|draft|run|open-pr|tag" ;;
+  account) account_cmd "$@" ;;
+  *) fail "usage: ship.sh prepare|draft|run|open-pr|tag|account" ;;
 esac

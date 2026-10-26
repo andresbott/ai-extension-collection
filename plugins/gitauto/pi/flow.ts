@@ -1,13 +1,16 @@
 // The gitauto flows for pi, harness-free: every side effect comes in through
 // Deps, so the flows can be tested with fakes. The scripts decide; this code only
-// runs them, asks a model for the texts they list, and asks the user about tags.
+// runs them, asks a model for the texts they list, and asks the user which gh
+// account to use and whether to tag.
 import {
   NO_TAG,
+  accountQuestion,
   failureBlock,
   firstLine,
   lastLine,
   parseFields,
   parseShipArgs,
+  resultLine,
   tagQuestion,
   writeKeys,
   type Texts,
@@ -47,19 +50,31 @@ const CHEAP_CONTEXT_ENV = {
 
 const code = (text: string) => ["```text", text, "```"].join("\n");
 
+/** The scripts' result lines on top, their outcome lines in a block, then notes. */
+const render = (results: (string | undefined)[], outcomes: string[], notes: string[] = []) =>
+  [...results.filter((r) => r !== undefined), code(outcomes.join("\n")), ...notes].join("\n\n");
+
+/** A script output that ends the flow: its result line, then its outcome line. */
+const outcome = (out: string) => render([resultLine(out)], [lastLine(out)]);
+
 export async function branchOut(deps: Deps, args: string): Promise<string> {
   const pre = await deps.script("branch-out.sh", [args]);
-  if (!pre.out.startsWith("NEED_NAME")) return code(lastLine(pre.out));
+  if (!pre.out.startsWith("NEED_NAME")) return outcome(pre.out);
   deps.progress("naming the branch");
   const { branch = [] } = await deps.write(pre.out, writeKeys(pre.out));
   const res = await deps.script("branch-out.sh", ["--create", ...branch]);
-  return code(lastLine(res.out));
+  return outcome(res.out);
 }
 
 export async function ship(deps: Deps, args: string, until: "ship" | "pr"): Promise<string> {
   const prepareArgs = until === "pr" ? ["prepare", "--for", "pr", args] : ["prepare", args];
   let pre = await deps.script("ship.sh", prepareArgs);
-  if (!pre.out.startsWith("SHIP")) return code(firstLine(pre.out));
+  if (pre.out.startsWith("NEED_ACCOUNT")) {
+    const stop = await pickAccount(deps, firstLine(pre.out));
+    if (stop) return stop;
+    pre = await deps.script("ship.sh", prepareArgs);
+  }
+  if (!pre.out.startsWith("SHIP")) return outcome(pre.out);
   const fields = parseFields(firstLine(pre.out));
   const notes: string[] = [];
 
@@ -69,7 +84,7 @@ export async function ship(deps: Deps, args: string, until: "ship" | "pr"): Prom
       notes.push("The expert writer saved no draft, so the cheap writer wrote the PR text.");
       deps.progress("the expert saved no draft; using the cheap writer");
       pre = await deps.script("ship.sh", prepareArgs, { env: CHEAP_CONTEXT_ENV });
-      if (!pre.out.startsWith("SHIP")) return code(firstLine(pre.out));
+      if (!pre.out.startsWith("SHIP")) return outcome(pre.out);
     }
   }
 
@@ -86,20 +101,22 @@ export async function ship(deps: Deps, args: string, until: "ship" | "pr"): Prom
   }
 
   const final = lastLine(res.out);
-  const report = [final];
+  const results = [resultLine(res.out)];
+  const outcomes = [final];
   const failure = failureBlock(res.out);
-  if (failure) report.push(failure);
-  if (until === "pr" && final.startsWith("READY")) notes.push("Run `/gitauto:ship` to merge.");
+  if (failure) outcomes.push(failure);
   if (until === "ship" && /(?:^|\s)tag=ask(?:\s|$)/.test(final)) {
     const tagged = await askTag(deps, final);
-    if (tagged) report.push(tagged);
-    else notes.push(`${NO_TAG} created.`);
+    if (tagged) {
+      results.push(resultLine(tagged));
+      outcomes.push(lastLine(tagged));
+    } else notes.push(`${NO_TAG} created.`);
   }
   if (failure) {
     const cause = await deps.diagnose(failure);
     if (cause) notes.push(cause);
   }
-  return [code(report.join("\n")), ...notes].join("\n\n");
+  return render(results, outcomes, notes);
 }
 
 /** The `run` flags from the command args. Only these survive a resume. */
@@ -123,11 +140,23 @@ function textFlags(texts: Texts): string[] {
   return flags;
 }
 
-/** Ask once; tag only an explicitly chosen version. Returns the tag line, if any. */
+/** Ask which gh account to use and save it. Returns a report when the flow must stop. */
+async function pickAccount(deps: Deps, line: string): Promise<string | undefined> {
+  const q = accountQuestion(parseFields(line));
+  const choice = await deps.select(q.title, q.options);
+  if (!choice || !q.options.includes(choice)) {
+    return render(["error: no GitHub account chosen, so nothing was shipped"], [line]);
+  }
+  deps.progress(`using the ${choice} account`);
+  const saved = await deps.script("ship.sh", ["account", choice]);
+  return lastLine(saved.out).startsWith("DONE state=saved") ? undefined : outcome(saved.out);
+}
+
+/** Ask once; tag only an explicitly chosen version. Returns the tag output, if any. */
 async function askTag(deps: Deps, final: string): Promise<string | undefined> {
   const q = tagQuestion(parseFields(final));
   const version = q.versionOf(await deps.select(q.title, q.options));
   if (!version) return undefined;
   const tagged = await deps.script("ship.sh", ["tag", version]);
-  return lastLine(tagged.out);
+  return tagged.out;
 }

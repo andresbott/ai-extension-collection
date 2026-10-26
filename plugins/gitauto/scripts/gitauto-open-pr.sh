@@ -40,7 +40,7 @@ if [[ $view_status -ne 0 ]]; then
   if printf '%s' "$view" | grep -qiE 'no pull requests found|could not resolve to a PullRequest'; then
     view=''
   else
-    printf 'state=failed\nnumber=\nurl=\nbranch=%s\nreport=pull request lookup failed\n' "$branch"
+    printf 'state=failed\nnumber=\nurl=\nbranch=%s\nreport=pull request lookup failed: %s\n' "$branch" "$(gitauto_gh_error "$view")"
     exit 2
   fi
 fi
@@ -77,7 +77,14 @@ if [[ -z "$branch" ]] || gitauto_remote_default_unresolved origin || gitauto_is_
   exit 0
 fi
 
-url="$(gh pr create --base "$base" --head "$branch" --title "$title" --body "$body")"
+# gh's own error goes into the report; a bare `set -e` exit would leave none.
+err="$(mktemp "${TMPDIR:-/tmp}/gitauto-gh.XXXXXX")"
+if ! url="$(gh pr create --base "$base" --head "$branch" --title "$title" --body "$body" 2>"$err")"; then
+  why="$(gitauto_gh_error "$(cat "$err")")"; rm -f "$err"
+  printf 'state=failed\nnumber=\nurl=\nbranch=%s\nreport=pull request creation failed: %s\n' "$branch" "${why#pull request create failed: }"
+  exit 2
+fi
+cat "$err" >&2; rm -f "$err"
 number="${url%/}"; number="${number##*/}"
 [[ "$number" =~ ^[0-9]+$ ]] || number=''
 printf 'state=created\nnumber=%s\nurl=%s\nbranch=%s\nreport=pull request created\n' "$number" "$url" "$branch"

@@ -1,6 +1,7 @@
 // gitauto for pi: registers /gitauto:branch-out, /gitauto:open-pr, and
 // /gitauto:ship. The flows (flow.ts) are harness-free; this file binds them to
-// pi: the bundled scripts, nested model calls, the tag question, and progress.
+// pi: the bundled scripts, nested model calls, the account and tag questions,
+// and progress.
 //
 // Models, as in Claude Code (haiku for the command, opus for pr-writer):
 // - simple texts (branch names, messages, small PR texts, failure diagnosis) use
@@ -67,7 +68,7 @@ export default function gitauto(pi: ExtensionAPI) {
           await ctx.waitForIdle();
           report = await flow(makeDeps(ctx, progress), args.trim());
         } catch (err) {
-          report = `failed: ${err instanceof Error ? err.message : String(err)}`;
+          report = `error: ${err instanceof Error ? err.message : String(err)}`;
           ctx.ui.notify(`gitauto:${name} ${report}`, "error");
         } finally {
           progress.clear();

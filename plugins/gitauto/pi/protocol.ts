@@ -18,12 +18,20 @@ export function lastLine(out: string): string {
   return out.split("\n").filter((l) => l.trim() !== "").at(-1)?.trim() ?? "";
 }
 
-/** The `--- failure` block a failed run prints just before its final line. */
+const RESULT = /^(?:success|warning|error): /;
+
+/** The `success:`, `warning:`, or `error:` line a script prints right above its final line. */
+export function resultLine(out: string): string | undefined {
+  const line = out.split("\n").filter((l) => l.trim() !== "").at(-2)?.trim();
+  return line !== undefined && RESULT.test(line) ? line : undefined;
+}
+
+/** The `--- failure` block a failed run prints just before its result and final lines. */
 export function failureBlock(out: string): string | undefined {
   const lines = out.replace(/\n+$/, "").split("\n");
   const start = lines.findIndex((l) => l.startsWith("--- failure"));
   if (start < 0) return undefined;
-  return lines.slice(start, -1).join("\n");
+  return lines.slice(start, RESULT.test(lines.at(-2) ?? "") ? -2 : -1).join("\n");
 }
 
 /** Keys of the `--- write` block, in order: the texts the model must write. */
@@ -105,6 +113,14 @@ export function parseShipArgs(args: string): ShipOptions {
 }
 
 export const NO_TAG = "No tag";
+
+/** The account question for a `NEED_ACCOUNT` line: one option per account that can push. */
+export function accountQuestion(fields: Record<string, string>) {
+  return {
+    title: `Several GitHub accounts can push to ${fields.repo ?? "this repo"}. Which one should gitauto use? (saved for this clone)`,
+    options: (fields.accounts ?? "").split(",").filter(Boolean),
+  };
+}
 
 /** The release-tag question for a `tag=ask` line: "No tag" first, suggestion marked. */
 export function tagQuestion(fields: Record<string, string>) {

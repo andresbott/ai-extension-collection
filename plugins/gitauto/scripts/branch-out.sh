@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Token-cheap branch-out. Every outcome except NEED_NAME is a single stdout line.
+# Token-cheap branch-out. Every outcome except NEED_NAME is a result line for
+# people (`success: ...` or `error: ...`), then the DONE line as the last line.
 #
 #   branch-out.sh [name]            preflight (run by the command's ! line)
 #   branch-out.sh --create n1 [n2]  create the first free candidate
@@ -18,13 +19,18 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/gitauto-lib.sh"
 
-fail() { printf 'DONE state=failed report=%s\n' "$*"; exit 2; }
+fail() {
+  printf 'error: failed to create a feature branch: %s\n' "$*"
+  printf 'DONE state=failed report=%s\n' "$*"
+  exit 2
+}
 
 git rev-parse --git-dir >/dev/null 2>&1 || fail "not a git repository"
 current="$(git branch --show-current)"
 [[ -n "$current" ]] || fail "detached HEAD"
 gitauto_remote_default_unresolved origin && fail "default branch could not be resolved safely"
 if ! gitauto_is_protected_branch "$current" origin; then
+  printf 'success: already on the feature branch %s\n' "$current"
   printf 'DONE state=unchanged branch=%s\n' "$current"
   exit 0
 fi
@@ -54,6 +60,7 @@ pick() {
   gitauto_is_protected_branch "$(git branch --show-current)" origin ||
     fail "branch safety check changed before switch"
   git switch -qc "$1" 2>/dev/null || fail "git switch -c $1 failed"
+  printf 'success: created %s from %s and switched to it\n' "$1" "$current"
   printf 'DONE state=created branch=%s from=%s\n' "$1" "$current"
 }
 
