@@ -58,7 +58,7 @@ TypeScript, so no model decides how to run it:
   output. For complex changes, a one-shot `pi --print` process runs the shared
   `pr-writer.md` prompt with read-only tools and saves the draft. If it saves
   none, the cheap writer takes over.
-- **Two models, as in Claude Code** (haiku for the command, opus for
+- **Two models, as in Claude Code** (haiku for the command, sonnet for
   `pr-writer`), with no setup:
   - **Simple texts** (branch names, commit messages, small PR texts, the failure
     diagnosis) use a cheap model: Haiku, or else a GPT mini or a Flash model.
@@ -116,9 +116,11 @@ TypeScript, so no model decides how to run it:
 2. **Writing the text:**
    - `writer=cheap`: haiku writes the prose title, the Conventional subject,
      the body, or the message from that context.
-   - `writer=expert`: haiku launches the `pr-writer` agent (**`model: opus`**).
+   - `writer=expert`: haiku launches the `pr-writer` agent (**`model: sonnet`**).
      It reads the repository itself and saves the draft with `ship.sh draft`, so
-     haiku never re-types the body.
+     haiku never re-types the body. It sets `omitClaudeMd: true`, so it starts
+     without your CLAUDE.md files (its prompt holds every rule it needs;
+     Claude Code v2.1.271 or later, older versions ignore the field).
    - An already-open PR only needs a commit message; a clean tree needs nothing.
 3. **`run`** is a normal foreground tool call. It chains the helpers and blocks
    inside the script on `gh pr checks --watch`, so the model doesn't poll in a
@@ -264,7 +266,7 @@ cheap writer's patch.
 
 A PR title is **plain prose** (`Add a discovery view for albums`). The squash
 subject is a separate **Conventional Commit** line
-(`feat(webui): add discovery view`). The writer (haiku, or the Opus
+(`feat(webui): add discovery view`). The writer (haiku, or the Sonnet
 `pr-writer`) produces both in one pass, so it costs about one extra output line.
 
 - **Saved in the PR.** `run` adds `<!-- gitauto-subject: <subject> -->` to the
