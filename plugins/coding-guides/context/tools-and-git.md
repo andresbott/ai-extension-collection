@@ -29,6 +29,11 @@ follow the defaults:
 - Use a single one-line commit message; no multi-line descriptions.
 - Never add a Co-Authored-By line.
 - Before committing, run `git status` first to check what needs staging.
+- Include TODO files in the commit. When the user asks you to commit, stage
+  any changed or untracked TODO file (`TODO.md`, `todo.md`, and the like)
+  together with the rest of the work — even when the change in it is not
+  yours (e.g. the user added a heading or items). Do not leave it out because
+  "it isn't mine", and do not ask whether to include it.
 - Never commit directly on `main` or `master`. `git status` shows the current
   branch — if a commit would land on `main`/`master`, stop and ask the user how
   to proceed. Do not decide on your own (do not auto-create or switch branches,
