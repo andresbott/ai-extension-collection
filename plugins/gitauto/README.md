@@ -20,6 +20,15 @@ be written the second time.
 
 **Requirements:** `git`, the GitHub CLI (`gh`), and `jq`.
 
+## Skills
+
+| Skill | Behaviour |
+|---|---|
+| `/gitauto:generate-readme` | Creates or updates the root `README.md` and `DEVELOPMENT.md`. The README is a short, quick-glance page for users: name, one-sentence description, a screenshot or logo, what you can do with the project, install steps (or add-to-project steps and a happy-path example for a library), a link to `DEVELOPMENT.md`, and a one-line license footer. Detailed reference moves to `docs/`. `DEVELOPMENT.md` holds the toolchain, local runs, tasks, builds, and releases. It never commits. |
+
+The skill is plain instructions (`skills/generate-readme/SKILL.md`), shared by
+Claude Code and pi; no script backs it.
+
 ## One core, two adapters
 
 ```text

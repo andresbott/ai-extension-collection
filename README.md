@@ -10,7 +10,7 @@ and [pi package](https://pi.dev/packages) of reusable extensions.
 | `architects` | Agents | ✅ | ✅ | Specialist agents for Go, Vue and TypeScript, OpenAPI, dependency layering, and project setup validation. In pi they need [`pi-subagents`](https://github.com/nicobailon/pi-subagents). |
 | `coding-guides` | Hooks, Skills, pi extension | ✅ | ✅ | Injects standing coding conventions into the session and its subagents, and enforces selected tool-use rules. `/auto-deliver` hands the rest of a feature to the agent, which stops only for critical issues. `/tldr` sums up the last answer, the work so far, or a topic in a few plain-language bullet points, without code names or jargon. `/explain` gives a short numbered picture of how a path, package, or feature works: the flows that matter, each a few steps checked against the code, with similar calls grouped and setup left out. `/auto-improve` improves the current branch unattended: one subagent reviews, a fresh subagent fixes each finding test-first, complex findings can be planned and landed by subagents, and a second review checks the fixes, all tracked in `TODO.md`. |
 | `doc-authoring` | Skill | ✅ | ✅ | Helps create and maintain internal, agent-facing project documentation. |
-| `gitauto` | Slash commands, Agent, pi extension | ✅ | ✅ | Token-cheap, script-backed Git commands for Claude Code (on haiku) and pi: `open-pr` stops at green CI, `ship` has an opt-in tag prompt; an expensive PR writer is used only for complex changes. |
+| `gitauto` | Slash commands, Agent, Skill, pi extension | ✅ | ✅ | Token-cheap, script-backed Git commands for Claude Code (on haiku) and pi: `open-pr` stops at green CI, `ship` has an opt-in tag prompt; an expensive PR writer is used only for complex changes. `/generate-readme` writes a short, quick-glance README.md (header with image, what you can do with it, install or add-to-project steps, license footer) and a separate DEVELOPMENT.md. |
 | `go-idioms` | Skills | ✅ | ✅ | Effective Go and idiomatic Go guidance for writing, reviewing, and refactoring Go code. |
 | `session-sounds` | Hooks | ✅ | ❌ | Plays a bundled sound (via `paplay`) when Claude finishes responding and on notifications. |
 | `pi-clear` | pi extension | ❌ | ✅ | `/clear` hides earlier conversation from the model while keeping the session. |
@@ -43,7 +43,7 @@ After a plugin is published, install it with:
 ## Use it in pi
 
 Plugins with a pi adapter (`coding-guides`, `gitauto`), pi agents (`architects`),
-skills (`coding-guides`, `doc-authoring`, `go-idioms`), and the pi-only `pi-*` plugins are also
+skills (`coding-guides`, `doc-authoring`, `gitauto`, `go-idioms`), and the pi-only `pi-*` plugins are also
 a [pi package](https://pi.dev/packages), listed in the root `package.json`:
 
 ```sh
