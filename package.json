@@ -1,6 +1,6 @@
 {
   "name": "ai-extension-collection",
-  "version": "0.14.1",
+  "version": "0.15.0",
   "private": true,
   "description": "Pi package for the ai-extension-collection plugins that ship a pi adapter, pi-only extension, pi agents (plugins/<name>/pi/), or Agent Skills (plugins/<name>/skills/).",
   "type": "module",
@@ -25,6 +25,7 @@
     "skills": [
       "./plugins/coding-guides/skills",
       "./plugins/doc-authoring/skills",
+      "./plugins/gitauto/skills",
       "./plugins/go-idioms/skills"
     ],
     "subagents": {
