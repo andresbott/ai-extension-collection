@@ -6,7 +6,7 @@
     "email": "contact@andresbott.com"
   },
   "description": "Claude Code extensions marketplace",
-  "version": "0.26.0",
+  "version": "0.27.0",
   "plugins": [
     {
       "name": "architects",
@@ -16,7 +16,7 @@
     {
       "name": "coding-guides",
       "source": "./plugins/coding-guides",
-      "description": "Injects standing coding conventions into sessions and subagents, enforces selected tool-use rules, and adds /auto-deliver to hand off the rest of a feature, /tldr for short, plain-language summaries, and /explain for a numbered walk-through of how code works."
+      "description": "Injects standing coding conventions into sessions and subagents, enforces selected tool-use rules, and adds /auto-deliver to hand off the rest of a feature, /tldr for short, plain-language summaries, /explain for a numbered walk-through of how code works, and /auto-improve for an unattended review-and-fix run on the current branch."
     },
     {
       "name": "doc-authoring",
