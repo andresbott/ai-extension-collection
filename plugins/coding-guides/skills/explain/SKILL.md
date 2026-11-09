@@ -1,11 +1,12 @@
 ---
 name: explain
-description: Use when you want to know how a piece of code works — a path, package, feature, or question — as one numbered list of every flow a caller can start, each a short walk-through of what happens, in order, checked against the code itself.
+description: Use when you want to know how a piece of code works — a path, package, feature, or question — as a short numbered picture of the flows that matter, each a few steps of what happens, in order, checked against the code itself. Groups similar calls (like CRUD) into one point and skips setup.
 disable-model-invocation: true
 ---
 
 Explain how the code works as short walk-throughs: what happens, in the order
-it happens, from what the caller does to what comes back. The reader is a
+it happens, from what the caller does to what comes back. Short is the goal:
+the reader should see the shape of the code at a glance, not read a manual. The reader is a
 developer who knows the domain but not this code. They should come away with an
 accurate picture of every flow they can start and the few design choices that
 shape them. Accuracy comes first: every step must be true of the code as it is
@@ -13,19 +14,25 @@ now.
 
 ## What to explain
 
-- A path (file, package, directory): every flow a caller can start. A question
-  or topic ("how does checkout work"): the flows that answer it, from the
-  trigger to the result.
+- The goal is a picture of what the code does, not a catalogue of its API. A
+  path (file, package, directory): the few flows that make up its job. A
+  question or topic ("how does checkout work"): the flows that answer it, from
+  the trigger to the result.
 - A flow is a call the caller makes for a purpose of its own: an exported
-  function or method, a handler, a command, a job. Each one gets its own entry,
-  including:
-  - Variants of another flow: a call that runs the same steps but returns more
-    detail, or does part of the work ahead of time.
-  - Maintenance and admin calls the caller makes on its own: cleanup, deletion,
-    rebuilds, migrations, including the ones on parts the caller constructs and
-    holds (a store, a cache).
-- Not flows: constructors, options, config, getters, pure helpers the flows
-  use, and test kits for implementers.
+  function or method, a handler, a command, a job. Pick the ones that tell the
+  reader what the code is for, and summarize the rest:
+  - Calls that do the same kind of job on different inputs, and
+    create/read/update/delete-style groups, become one point ("CRUD on
+    bookmarks: create, edit, list and delete go straight to the store"). Say
+    what the group is and what it has in common; do not walk through each call.
+  - Variants of a flow (same steps, different input or more detail) are one
+    line inside the flow they vary, saying only what differs.
+  - Maintenance and admin calls (cleanup, deletion, rebuilds, migrations) get
+    one short point at the end, and only when they change what the reader
+    needs to know.
+- Left out entirely: setup and initialization (constructors, options, config,
+  wiring), getters, pure helpers the flows use, and test kits for implementers.
+  A call with nothing worth saying beyond its name is left out too.
 
 ## Read before writing
 
@@ -33,9 +40,10 @@ Trace the real path; do not write from file names, doc comments, or a quick
 skim.
 
 1. List the entry points first. Go through the exported API of the target and
-   of every part the caller constructs, and keep every call that starts a flow
-   by the rules above. Each one on the list gets an entry; do not drop one
-   because it is short or looks secondary.
+   of every part the caller constructs, sort each call by the rules above into
+   a main flow, a variant, part of a group, maintenance, or left out, and plan
+   the points from that. Read all of them, so nothing is missed, but write
+   only the points the picture needs.
 2. For each flow, find the entry point and follow the calls, in the order they
    run, into every function that does a step of the flow. Read the bodies, not
    only their comments.
@@ -57,18 +65,34 @@ does part of a step is part of that step, not a step of its own.
 
 ## Format
 
-At most a few words before the list. Then one numbered list with an item per
-flow, the main flow first, variants right after the flow they share, and
-maintenance calls last:
+The answer must be scannable in under a minute. Aim for the whole answer to fit
+on one screen (about 40 lines); more than that means too many items, too many
+steps, or too much detail per step.
 
-- Each item is a label, the call's name with its purpose in a few words in
-  parentheses ("Get (serve a thumbnail)"), and its steps lettered a., b., c.
-  under it. Calls that belong together, such as two cleanup calls on one store,
-  may share an item with a step each.
-- Two to nine steps per flow, one action each. A main flow usually needs five
-  or more; a variant or maintenance call often needs only two or three.
-- Hard limit: at most two sentences and about 40 words per step. A step that
-  needs more is either two steps or carries detail that does not belong.
+Open with a one- or two-line map: the families of flows and which one is the
+main path ("Two kinds of content, text and media; every media search ends in the
+same lookup"). Then one numbered list:
+
+- One item per family, not per call. Calls that run the same steps and differ
+  only in what they start from or what they return share an item: the shared
+  steps are written once, and each call gets one line saying what differs
+  ("SearchImage starts from a picture", "SearchText embeds a description
+  instead"). Give a call its own item only when its steps really differ.
+- Order: the main flow first, its variants in the same item, maintenance calls
+  last, sharing one item when they do the same job on different parts.
+- Each item is a label (the main call's name with its purpose in a few words in
+  parentheses, "Index (store a text document)") and its steps lettered a., b.,
+  c. under it.
+- Two to five steps per flow, one action each. Variant lines and maintenance
+  calls take one or two steps.
+- Hard limit: one sentence and about 25 words per step. A step that needs more
+  is either two steps or carries detail that does not belong.
+- A skip-if-unchanged check is a clause in the first step ("…, unless the
+  text is unchanged"), never a step of its own, and is not repeated per flow.
+- Steps are what the caller can observe or depend on: what goes in, what is
+  stored or looked up, what comes back. Internal mechanics (over-fetching,
+  score cut-offs, tie-breaks, how the chunker packs text, the model's role
+  labels) stay out unless the caller sets them.
 - The level is the flow, not the mechanics: what happens and in what order,
   not how each step does it. "The library reads the reply as tag names" is
   enough; the separators it splits on, the marks it strips and the lengths it
@@ -135,8 +159,13 @@ its own is a flow, and it gets an entry.
 
 Write the draft, then go through it once and fix every hit:
 
-1. Every entry point from the list in "Read before writing" has an entry.
-2. No step is over two sentences or about 40 words.
+1. Every main flow from the list in "Read before writing" has a point; the
+   other calls are folded into a group, a variant line or a maintenance point,
+   or left out on purpose. No point exists only to list setup or a single
+   plain getter/setter.
+2. No step is over one sentence or about 25 words, and the whole answer is
+   about one screen. If not, merge calls into shared items and cut internal
+   mechanics and default values.
 3. No code name the reader does not call or provide, and no option, constant
    or exact number the reader does not pass in.
 4. Nothing from "What to leave out" inside a step or in a note.
