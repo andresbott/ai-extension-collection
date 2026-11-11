@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { MAX_RESUMES, branchOut, ship, type Deps, type Script } from "./flow.ts";
+import { MAX_RESUMES, newBranch, ship, type Deps, type Script } from "./flow.ts";
 import type { Texts } from "./protocol.ts";
 
 interface Call {
@@ -42,15 +42,15 @@ function fake(outputs: Record<string, string[]>, opts: { texts?: Texts; expert?:
   return { deps, calls, written, asked, experts };
 }
 
-test("branch-out returns a DONE outcome without the model, its result line on top", async () => {
+test("new-branch returns a DONE outcome without the model, its result line on top", async () => {
   const f = fake({ "*": ["success: already on the feature branch feat/x\nDONE state=unchanged branch=feat/x"] });
-  const report = await branchOut(f.deps, "");
+  const report = await newBranch(f.deps, "");
   assert.equal(report, "success: already on the feature branch feat/x\n\n```text\nDONE state=unchanged branch=feat/x\n```");
   assert.equal(f.written.length, 0);
   assert.deepEqual(f.calls[0].args, [""]);
 });
 
-test("branch-out asks the model for names, then creates one", async () => {
+test("new-branch asks the model for names, then creates one", async () => {
   const f = fake(
     {
       "": ["NEED_NAME on=main\n M a.txt\n--- write\nbranch: 3 distinct names"],
@@ -58,7 +58,7 @@ test("branch-out asks the model for names, then creates one", async () => {
     },
     { texts: { branch: ["feat/a", "feat/b", "feat/c"] } },
   );
-  const report = await branchOut(f.deps, "");
+  const report = await newBranch(f.deps, "");
   assert.deepEqual(f.written, [["branch"]]);
   assert.deepEqual(f.calls[1].args, ["--create", "feat/a", "feat/b", "feat/c"]);
   assert.equal(

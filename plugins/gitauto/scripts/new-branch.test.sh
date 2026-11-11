@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Tests for branch-out.sh. Fixtures live in $TMPDIR; the surrounding repo is untouched.
+# Tests for new-branch.sh. Fixtures live in $TMPDIR; the surrounding repo is untouched.
 set -euo pipefail
 
-SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/branch-out.sh"
+SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/new-branch.sh"
 dirs=()
 trap 'rm -rf "${dirs[@]}"' EXIT
 

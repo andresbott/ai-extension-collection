@@ -69,7 +69,7 @@ out="$(ship run --branch 'bad..name' --title 'feat: x' --body-stdin <<<'Because.
 grep -q '^STOPPED stage=branch state=failed report=no valid branch name candidate log=' <<<"$out" || fail "bad branch: $out"
 [[ "$(result "$out")" == 'error: failed to create a feature branch: no valid branch name candidate' ]] || fail "bad branch result: $out"
 [[ "$(on)" == main ]] || fail "should stay on main"
-pass "a branch-out failure inside run stops with its reason"
+pass "a new-branch failure inside run stops with its reason"
 
 out="$(ship draft --title 'feat: add change' --body-stdin <<<'## Summary
 Because.')"

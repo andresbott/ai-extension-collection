@@ -52,7 +52,7 @@ follow the defaults:
   to push — after committing, stop and report. Never add `git push` to the
   allow list.
 - **The user runs gitauto, never you.** Do not start `/gitauto:ship`,
-  `/gitauto:open-pr`, or `/gitauto:branch-out`, or their scripts, on your own,
+  `/gitauto:open-pr`, or `/gitauto:new-branch`, or their scripts, on your own,
   and do not offer to: not as a question ("should I ship it?"), and not folded
   into a bundle ("should I fix X, update Y, and ship?") where one "yes"
   approves the run. When the work is ready, say so and stop; the user starts

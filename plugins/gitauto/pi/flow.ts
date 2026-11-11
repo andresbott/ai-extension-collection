@@ -16,7 +16,7 @@ import {
   type Texts,
 } from "./protocol.ts";
 
-export type Script = "ship.sh" | "branch-out.sh";
+export type Script = "ship.sh" | "new-branch.sh";
 
 export interface ScriptResult {
   code: number;
@@ -57,12 +57,12 @@ const render = (results: (string | undefined)[], outcomes: string[], notes: stri
 /** A script output that ends the flow: its result line, then its outcome line. */
 const outcome = (out: string) => render([resultLine(out)], [lastLine(out)]);
 
-export async function branchOut(deps: Deps, args: string): Promise<string> {
-  const pre = await deps.script("branch-out.sh", [args]);
+export async function newBranch(deps: Deps, args: string): Promise<string> {
+  const pre = await deps.script("new-branch.sh", [args]);
   if (!pre.out.startsWith("NEED_NAME")) return outcome(pre.out);
   deps.progress("naming the branch");
   const { branch = [] } = await deps.write(pre.out, writeKeys(pre.out));
-  const res = await deps.script("branch-out.sh", ["--create", ...branch]);
+  const res = await deps.script("new-branch.sh", ["--create", ...branch]);
   return outcome(res.out);
 }
 

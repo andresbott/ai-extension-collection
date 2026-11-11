@@ -1,4 +1,4 @@
-// gitauto for pi: registers /gitauto:branch-out, /gitauto:open-pr, and
+// gitauto for pi: registers /gitauto:new-branch, /gitauto:open-pr, and
 // /gitauto:ship. The flows (flow.ts) are harness-free; this file binds them to
 // pi: the bundled scripts, nested model calls, the account and tag questions,
 // and progress.
@@ -18,7 +18,7 @@ import { fileURLToPath } from "node:url";
 
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 
-import { branchOut, ship, type Deps, type Script, type ScriptResult } from "./flow.ts";
+import { newBranch, ship, type Deps, type Script, type ScriptResult } from "./flow.ts";
 import { findModel, pickCheapModel } from "./models.ts";
 import { WRITE_SYSTEM_PROMPT, parseTexts, stripFrontmatter } from "./protocol.ts";
 
@@ -38,7 +38,7 @@ type Model = NonNullable<ExtensionCommandContext["model"]>;
 type Flow = (deps: Deps, args: string) => Promise<string>;
 
 const COMMANDS: [name: string, description: string, flow: Flow][] = [
-  ["branch-out", "Move off main/master onto a feature branch (no-op on a feature branch)", branchOut],
+  ["new-branch", "Move off main/master onto a feature branch (no-op on a feature branch)", newBranch],
   [
     "open-pr",
     "Open (or reuse) a PR and wait for green CI: branch, verify, commit, push, open PR, watch CI. Never merges.",

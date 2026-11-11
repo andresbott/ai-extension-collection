@@ -348,7 +348,7 @@ run() {
   if [[ -z "$branch" ]] || gitauto_is_protected_branch "$branch" origin; then
     [[ ${#branches[@]} -gt 0 ]] || { st=failed; stop branch "on ${branch:-detached HEAD}; --branch candidates are required"; }
     begin branch
-    out="$("$D/branch-out.sh" --create "${branches[@]}" 2>> "$log")"
+    out="$("$D/new-branch.sh" --create "${branches[@]}" 2>> "$log")"
     printf '%s\n' "$out" >> "$log"
     st="$(sed -n 's/^DONE .*state=\([^ ]*\).*/\1/p' <<< "$out")"; st="${st:-error}"
     end branch
