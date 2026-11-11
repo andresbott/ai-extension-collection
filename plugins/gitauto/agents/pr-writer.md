@@ -45,4 +45,8 @@ Save it by running the supplied draft command exactly once:
 EOF
 ```
 
-Reply with only the line that command printed.
+Your job is done only once that command has printed its `DRAFTED` line. Do
+not end your run or send any report before then, and never report a
+placeholder or a progress note. If the command fails, fix what it names and
+run it again. Your final report, however it is delivered, is only the
+`DRAFTED` line.

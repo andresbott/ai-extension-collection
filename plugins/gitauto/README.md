@@ -129,11 +129,14 @@ TypeScript, so no model decides how to run it:
      It reads the repository itself and saves the draft with `ship.sh draft`, so
      haiku never re-types the body. It sets `omitClaudeMd: true`, so it starts
      without your CLAUDE.md files (its prompt holds every rule it needs;
-     Claude Code v2.1.271 or later, older versions ignore the field).
+     Claude Code v2.1.271 or later, older versions ignore the field). If its
+     report has no `DRAFTED` line, haiku starts it once more, then stops.
    - An already-open PR only needs a commit message; a clean tree needs nothing.
 3. **`run`** is a normal foreground tool call. It chains the helpers and blocks
    inside the script on `gh pr checks --watch`, so the model doesn't poll in a
-   loop and reads the output only once, when the call returns.
+   loop and reads the output only once, when the call returns. When `prepare`
+   said a PR is needed and no title and body were passed or saved, `run` stops
+   before verify, so nothing is pushed without a PR text.
 
 ## GitHub account
 
