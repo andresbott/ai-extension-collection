@@ -177,6 +177,8 @@ prepare() {
        if (( files > COMPLEX_FILES || lines > COMPLEX_LINES || dirs > COMPLEX_DIRS )); then writer=expert; fi ;;
   esac
   [[ "$need" == pr ]] || writer=cheap
+  # Tell run a PR text is needed, so it stops before any change when none arrives.
+  [[ "$need" != pr ]] || { mkdir -p "$draft_dir" && : > "$draft_dir/need-pr"; }
 
   printf 'SHIP branch=%s protected=%s base=%s pr=%s dirty=%s ahead=%s files=%s lines=%s dirs=%s need=%s writer=%s\n' \
     "$current" "$protected" "$base" "${pr// /_}" "$dirty" "$ahead" "$files" "$lines" "$dirs" "$need" "$writer"
@@ -262,6 +264,9 @@ run() {
   [[ -z "$title" ]] || one_line "$title" || fail "--title must be one line"
   [[ -n "$subject" ]] || ! is_cc "$title" || subject="$title"
   [[ -n "$title" ]] || title="$subject"
+  # Without this, a missing text fails only at open-pr, after verify and push.
+  [[ ! -f "$draft_dir/need-pr" || ( -n "$title" && -n "$body" ) ]] ||
+    fail "no PR title and body were passed or saved as a draft, so nothing was changed"
   # Save the subject in the PR body so a later ship, in any session, merges without a model.
   [[ -z "$body" || -z "$subject" ]] || body+=$'\n\n'"<!-- $SUBJECT_TAG: $subject -->"
 
@@ -343,7 +348,7 @@ run() {
   if [[ -z "$branch" ]] || gitauto_is_protected_branch "$branch" origin; then
     [[ ${#branches[@]} -gt 0 ]] || { st=failed; stop branch "on ${branch:-detached HEAD}; --branch candidates are required"; }
     begin branch
-    out="$("$D/branch-out.sh" --create "${branches[@]}" 2>> "$log")"
+    out="$("$D/new-branch.sh" --create "${branches[@]}" 2>> "$log")"
     printf '%s\n' "$out" >> "$log"
     st="$(sed -n 's/^DONE .*state=\([^ ]*\).*/\1/p' <<< "$out")"; st="${st:-error}"
     end branch

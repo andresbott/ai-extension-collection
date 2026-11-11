@@ -53,16 +53,23 @@ grep -q 'need=pr writer=expert$' <<<"$out" || fail "expert: $out"
   fail "expert on main only needs branch names: $out"
 pass "large change is handed to the expert writer with no patch"
 
-out="$(ship run --title 'feat: x')"
+out="$(ship run --branch feat/change)"
+[[ "$out" == $'error: no PR title and body were passed or saved as a draft, so nothing was changed\nDONE state=failed report=no PR title and body were passed or saved as a draft, so nothing was changed' ]] ||
+  fail "missing draft: $out"
+[[ "$(on)" == main ]] || fail "missing draft must not branch"
+! git --git-dir="$remote" show-ref --verify --quiet refs/heads/feat/change || fail "missing draft must not push"
+pass "run stops before any change when prepare needs a PR text and none was saved"
+
+out="$(ship run --title 'feat: x' --body-stdin <<<'Because.')"
 grep -q '^STOPPED stage=branch ' <<<"$out" || fail "branch required: $out"
 [[ "$(on)" == main ]] || fail "should stay on main"
 pass "run on main without branch candidates stops before any mutation"
 
-out="$(ship run --branch 'bad..name' --title 'feat: x')"
+out="$(ship run --branch 'bad..name' --title 'feat: x' --body-stdin <<<'Because.')"
 grep -q '^STOPPED stage=branch state=failed report=no valid branch name candidate log=' <<<"$out" || fail "bad branch: $out"
 [[ "$(result "$out")" == 'error: failed to create a feature branch: no valid branch name candidate' ]] || fail "bad branch result: $out"
 [[ "$(on)" == main ]] || fail "should stay on main"
-pass "a branch-out failure inside run stops with its reason"
+pass "a new-branch failure inside run stops with its reason"
 
 out="$(ship draft --title 'feat: add change' --body-stdin <<<'## Summary
 Because.')"

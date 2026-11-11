@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Token-cheap branch-out. Every outcome except NEED_NAME is a result line for
+# Token-cheap new-branch. Every outcome except NEED_NAME is a result line for
 # people (`success: ...` or `error: ...`), then the DONE line as the last line.
 #
-#   branch-out.sh [name]            preflight (run by the command's ! line)
-#   branch-out.sh --create n1 [n2]  create the first free candidate
+#   new-branch.sh [name]            preflight (run by the command's ! line)
+#   new-branch.sh --create n1 [n2]  create the first free candidate
 #
 # Lines:
 #   DONE state=unchanged branch=<b>              already on a feature branch

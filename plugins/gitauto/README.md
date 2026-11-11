@@ -9,7 +9,7 @@ expensive model is used only when a PR description is genuinely hard to write.
 
 | Command | Arguments | Behaviour |
 |---|---|---|
-| `/gitauto:branch-out` | `[branch name]` | On `main`/`master`/the default branch, creates and checks out a feature branch; otherwise leaves the current branch unchanged. |
+| `/gitauto:new-branch` | `[branch name]` | On `main`/`master`/the default branch, creates and checks out a feature branch; otherwise leaves the current branch unchanged. |
 | `/gitauto:open-pr` | `[branch name]` | branch → verify → commit → push → open (or reuse) PR → wait for CI; stops at green (`READY`). Never merges. |
 | `/gitauto:ship` | `[branch name] [tag=<semver> \| no tag] [deleteRemote=true]` | The same flow, then squash-merge → sync main → cleanup → offer a release tag (never tags by default). |
 
@@ -45,7 +45,7 @@ pi/index.ts              pi adapter (loaded through the repo's package.json)
   `WAITING`. It never makes Git decisions.
 - **The output lines are the interface** (see [Output](#output)). Changing one
   is a breaking change: update the script tests and both adapters.
-- **Writing rules are printed, not copied.** `prepare` and `branch-out.sh` print
+- **Writing rules are printed, not copied.** `prepare` and `new-branch.sh` print
   a `--- write` block with one `<key>: <rule>` line per text they need
   (`branch`, `title`, `subject`, `body`, `message`). Each adapter hands it to its
   model unchanged, so the rules live only in `gitauto_write_rules`.
@@ -59,7 +59,7 @@ adapters):
 pi install git:github.com/andresbott/ai-extension-collection
 ```
 
-The same `/gitauto:branch-out`, `/gitauto:open-pr`, and `/gitauto:ship`
+The same `/gitauto:new-branch`, `/gitauto:open-pr`, and `/gitauto:ship`
 commands appear, with the same arguments. The pi adapter runs the flow in
 TypeScript, so no model decides how to run it:
 
@@ -90,13 +90,13 @@ TypeScript, so no model decides how to run it:
   `WAITING` rounds are rare; up to 5 are still resumed automatically.
 - `GITAUTO_PI_BIN` overrides the `pi` binary the expert writer runs.
 
-## How branch-out stays cheap
+## How new-branch stays cheap
 
 ```text
-/gitauto:branch-out  →  !`branch-out.sh`  →  (only if needed) branch-out.sh --create
+/gitauto:new-branch  →  !`new-branch.sh`  →  (only if needed) new-branch.sh --create
 ```
 
-- **`!` preprocessing** runs `scripts/branch-out.sh` before the model sees the
+- **`!` preprocessing** runs `scripts/new-branch.sh` before the model sees the
   prompt, so there's no exploratory tool call.
 - **Zero-tool paths.** Already on a feature branch, or given a valid explicit
   name: the script finishes during preprocessing and prints a result line
@@ -129,11 +129,14 @@ TypeScript, so no model decides how to run it:
      It reads the repository itself and saves the draft with `ship.sh draft`, so
      haiku never re-types the body. It sets `omitClaudeMd: true`, so it starts
      without your CLAUDE.md files (its prompt holds every rule it needs;
-     Claude Code v2.1.271 or later, older versions ignore the field).
+     Claude Code v2.1.271 or later, older versions ignore the field). If its
+     report has no `DRAFTED` line, haiku starts it once more, then stops.
    - An already-open PR only needs a commit message; a clean tree needs nothing.
 3. **`run`** is a normal foreground tool call. It chains the helpers and blocks
    inside the script on `gh pr checks --watch`, so the model doesn't poll in a
-   loop and reads the output only once, when the call returns.
+   loop and reads the output only once, when the call returns. When `prepare`
+   said a PR is needed and no title and body were passed or saved, `run` stops
+   before verify, so nothing is pushed without a PR text.
 
 ## GitHub account
 
@@ -249,7 +252,7 @@ so the target can read either spelling.
 - **Progress:** `run` prints a `ship: started; live output: tail -f <log>` line,
   then `ship: [n] <stage> ...` and `ship: [n] <stage> -> <state>` for each
   stage. `tail -f` the log for full live output, including the CI watch.
-- **Every outcome says what happened.** `ship.sh` and `branch-out.sh` print a
+- **Every outcome says what happened.** `ship.sh` and `new-branch.sh` print a
   result line for people right before each outcome line: `success: ...`,
   `warning: ...` (CI still running, or merged but sync/cleanup/tag
   incomplete), or `error: failed to <step>: <why>`. Every command shows it
@@ -297,7 +300,7 @@ subject is a separate **Conventional Commit** line
 DONE state=created|unchanged|nothing|failed ...        # nothing left for the model
 NEED_ACCOUNT host=<h> repo=<o/r> accounts=<a,b> ...     # prepare: ask, then `ship.sh account <login>`
 DONE state=saved account=<login> host=<h> repo=<o/r>    # ship.sh account: the pick is saved
-SHIP ... need=... writer=... / NEED_NAME ...            # prepare / branch-out: context follows
+SHIP ... need=... writer=... / NEED_NAME ...            # prepare / new-branch: context follows
 --- write                                               # then `<key>: <rule>` per text to write
 ship: [n] <stage> ... / -> <state>                      # progress, one pair per stage
 --- failure: verify|wait-ci ...                         # only on those failures
@@ -343,7 +346,7 @@ bash plugins/gitauto/scripts/run-tests.sh
 node --test plugins/gitauto/pi/*.test.ts
 ```
 
-The first runs `branch-out.test.sh`, `ship.test.sh` (a local bare remote plus a
+The first runs `new-branch.test.sh`, `ship.test.sh` (a local bare remote plus a
 fake `gh`, end to end), and the helper tests. The second runs the pi adapter's
 parser and flow tests, plus end-to-end runs of the pi commands against the real
 scripts with a fake model and the same fake `gh` (`scripts/testdata/fake-gh`).

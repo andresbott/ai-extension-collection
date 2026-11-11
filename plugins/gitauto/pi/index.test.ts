@@ -86,17 +86,17 @@ function load(cwd: string, reply: string, choice?: string, available: { provider
 
 test("registers the three gitauto commands", () => {
   const { commands } = load(tmpdir(), "");
-  assert.deepEqual([...commands.keys()], ["gitauto:branch-out", "gitauto:open-pr", "gitauto:ship"]);
+  assert.deepEqual([...commands.keys()], ["gitauto:new-branch", "gitauto:open-pr", "gitauto:ship"]);
 });
 
-test("/gitauto:branch-out names the branch with the model and creates it", async () => {
+test("/gitauto:new-branch names the branch with the model and creates it", async () => {
   const { repo } = fixture(false);
   const pi = load(repo, "=== branch\nfeat/pi-e2e\nfeat/other\nfeat/third");
-  await pi.run("gitauto:branch-out");
+  await pi.run("gitauto:new-branch");
   assert.equal(git(repo, "branch", "--show-current"), "feat/pi-e2e");
   assert.match(pi.prompts[0], /^NEED_NAME on=main/);
   assert.match(pi.messages[0], /DONE state=created branch=feat\/pi-e2e from=main/);
-  assert.match(pi.messages[0], /^\*\*\/gitauto:branch-out\*\*\n\nsuccess: created feat\/pi-e2e from main and switched to it\n\n```text\n/);
+  assert.match(pi.messages[0], /^\*\*\/gitauto:new-branch\*\*\n\nsuccess: created feat\/pi-e2e from main and switched to it\n\n```text\n/);
   assert.deepEqual(pi.models, ["fake/model"], "no cheap model available: the session's model");
 });
 
@@ -108,7 +108,7 @@ test("texts are written by a cheap available model, not the session's model", as
     { provider: "other", id: "claude-haiku-9" },
   ];
   const pi = load(repo, "=== branch\nfeat/cheap\nfeat/b\nfeat/c", undefined, available);
-  await pi.run("gitauto:branch-out");
+  await pi.run("gitauto:new-branch");
   assert.deepEqual(pi.models, ["fake/claude-haiku-4.5"]);
   assert.equal(git(repo, "branch", "--show-current"), "feat/cheap");
 });
@@ -152,7 +152,7 @@ test("GITAUTO_CHEAP_MODEL overrides the cheap pick", async () => {
   const pi = load(repo, "=== branch\nfeat/override\nfeat/b\nfeat/c", undefined, available);
   process.env.GITAUTO_CHEAP_MODEL = "fake/big";
   try {
-    await pi.run("gitauto:branch-out");
+    await pi.run("gitauto:new-branch");
   } finally {
     delete process.env.GITAUTO_CHEAP_MODEL;
   }

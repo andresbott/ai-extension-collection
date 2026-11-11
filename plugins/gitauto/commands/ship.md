@@ -25,7 +25,12 @@ Otherwise read the `SHIP` line and prepare the text:
 - If `need=pr writer=expert`, call the Agent tool once with subagent_type
   `gitauto:pr-writer` and the prompt
   `Base: <base>. Draft command: ${CLAUDE_PLUGIN_ROOT}/scripts/ship.sh draft`.
-  Do not write a title, subject, or body yourself; the run below loads the saved draft.
+  Wait for its final report (it may arrive later, as a notification) before
+  running anything. If the report has no line starting with `DRAFTED`, call the
+  agent once more the same way. If that report has no `DRAFTED` line either,
+  reply with `error: the PR writer saved no title or body, so nothing was shipped`
+  and stop. Do not write a title, subject, or body yourself; the run below
+  loads the saved draft.
 - Write each text the `--- write` block lists (if any), following its rule.
   Never use single quotes inside a text.
 
