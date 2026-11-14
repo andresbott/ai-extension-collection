@@ -16,11 +16,21 @@ You are the orchestrator. Subagents do the reading, fixing, and check runs, so
 your own context stays clean for the whole run. Ask each subagent for a report
 under 700 words; fix subagents need far less.
 
+The user's own words are the reference for the whole run: the request that
+started it, the scope, and the answers from step 0. Every subagent prompt quotes
+them verbatim under "The user asked:", with your reading of them separately
+under "My reading:", never as settled rulings.
+
 ## 0. Before the user leaves
 
 1. Check the branch. If it is `main` or `master`, ask the user which branch to
    work on, and wait.
-2. Ask the user two questions together and wait for the answers:
+2. Restate the request: the scope and anything else the user asked for, each
+   with a "Read as:" line. Name every word or phrase that could mean two
+   things, with both meanings. If a fork would lead to different work and the
+   context does not settle it, add it as a question to the ones below; this is
+   the last chance to ask.
+3. Ask the user two questions together and wait for the answers:
    - **Are breaking changes allowed?** Breaking means a change to a public
      API, CLI flags, config or file formats, wire formats, or a stored schema.
      Include the answer in every reviewer, planner, and fixer prompt.
@@ -28,7 +38,7 @@ under 700 words; fix subagents need far less.
      or a fix that spans several modules or needs a design choice. With "no",
      complex findings are deferred with a plan; with "yes", step 5 plans and
      lands them.
-3. Choose how to write TODO.md:
+4. Choose how to write TODO.md:
    - If the `todo` command is installed (`todo --version` succeeds), make every
      TODO.md change through it: `todo add-category`, `todo add --title --desc
      --parent-title`, `todo progress`, `todo done`, `todo defer`, `todo edit
@@ -132,6 +142,8 @@ Commit the TODO.md updates at the end of the round.
   ignores, no lowered thresholds or coverage, no weakened assertions. If the
   fix cannot pass without that, stop and report.
 - Stop and report if the fix needs a breaking change that is not allowed.
+- If what you find contradicts the finding, or the user's words as quoted,
+  report the conflict instead of working around it.
 - Commit per change with a one-line message. Never push.
 - Leave shared things alone: do not edit TODO.md (the orchestrator owns it),
   and do not touch the user's data, caches, running services, ports, git
@@ -194,10 +206,20 @@ after round 2; defer whatever is left.
 
 ## 7. Final verification
 
-Run the full checks, including the slow suites, in a subagent. Then report to
-the user, short:
+Run the full checks, including the slow suites, in a subagent.
 
-- what got better, in a few plain bullets
+Then launch a fresh subagent with only the user's words (as quoted in the
+briefs) and the range `<base>..HEAD`. It checks, point by point, that the work
+matches what the user asked: it stayed in scope, it honoured both answers, and
+nothing they asked for is missing. Do not give it your reading, the findings,
+or the fixers' reports. Revert or defer what does not match.
+
+Then report to the user, short:
+
+- **Check these**, first: the assumptions you made about what the user asked,
+  and any mismatch the last check found
+- what got better, in a few plain bullets, each saying where the change is in
+  terms the user can verify without reading the code
 - findings fixed, deferred, and not reproduced, per round
 - complex findings landed, and those stopped with the plan path and the
   question the user needs to answer

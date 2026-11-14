@@ -41,6 +41,29 @@ must follow them exactly unless the user overrides them in the current session.
   - Keep it conversational: a few short paragraphs, not a design document full
     of headings and tables.
 
+## Understanding the request
+
+The user's own words are the reference for the whole task. Your reading of
+them is a guess; never let it quietly take their place, not while building,
+not in a brief, and not when checking the result.
+
+- **Restate before acting.** On any non-trivial request, write one "Read as:"
+  line per item saying how you understand it, and name every word or phrase
+  that could mean two things, with both meanings.
+- **Do not guess at forks.** When two readings lead to different results and
+  the context does not settle it, ask. If the user is away, mark it "Needs
+  you:" with both readings and do the unambiguous parts first.
+- **Keep the user's words in every brief.** A subagent prompt quotes the
+  request verbatim under "The user asked:" and puts your reading separately
+  under "My reading:", never as settled rulings. Tell the subagent to report
+  anything that contradicts your reading instead of working around it.
+- **Check against the source.** Before calling the work done, have a fresh
+  subagent compare the result with the user's original words only, point by
+  point; do not give it your reading or the implementers' reports.
+- **Report what the user can check.** The done note opens with the
+  assumptions you made, then says for each request what changed and where, in
+  terms the user can verify without reading the code.
+
 ## Skills and code exploration
 
 - Detect aggressively: on every non-trivial task, actively check whether a
