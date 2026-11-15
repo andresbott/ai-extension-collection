@@ -54,3 +54,13 @@ set -e
 [[ $status -ne 0 && "$output" == *'state=failed'* ]] || fail "divergent main did not fail safely: status=$status output=$output"
 [[ "$(git -C "$primary" rev-parse HEAD)" == "$local_head" ]] || fail "divergent main was rewritten"
 printf 'PASS: divergent main is not rewritten\n'
+
+# Many worktrees make `git worktree list` write in several chunks; a reader that
+# stops at the first match must not kill the helper with SIGPIPE under pipefail.
+new_fixture
+for i in $(seq 150); do git -C "$primary" worktree add -q --no-checkout -b "extra/$i" "$root/extra-$i"; done
+for i in 1 2 3 4 5; do
+  output="$( (cd "$feature" && "$SYNC_SCRIPT") 2>&1)" || fail "sync with many worktrees failed on run $i: $output"
+  [[ "$output" == *'state=synced'* ]] || fail "sync with many worktrees did not sync on run $i: $output"
+done
+printf 'PASS: many worktrees do not break primary worktree lookup\n'

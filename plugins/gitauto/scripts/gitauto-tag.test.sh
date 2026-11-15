@@ -90,3 +90,15 @@ output="$( (cd "$root/feature" && "$TAG_SCRIPT" "worktree=$repo" 'version=v1.3.0
 [[ "$output" == *'state=tagged'* && "$(cat "$repo/tag.out")" == v1.3.0 ]] || fail "tag did not run in supplied primary worktree: $output"
 [[ ! -e "$root/feature/tag.out" ]] || fail "tag target ran in feature worktree"
 printf 'PASS: explicit tag runs in supplied synchronized primary worktree\n'
+
+# A long tag list is written in several chunks; picking the latest version must
+# not kill the helper with SIGPIPE under pipefail.
+new_fixture; add_tag_target
+head_sha="$(git -C "$repo" rev-parse HEAD)"
+for i in $(seq 0 49); do for j in $(seq 0 49); do printf 'create refs/tags/v0.%s.%s %s\n' "$i" "$j" "$head_sha"; done; done |
+  git -C "$repo" update-ref --stdin
+for i in 1 2 3 4 5; do
+  output="$( (cd "$repo" && "$TAG_SCRIPT" 'subject=feat: add release flow') 2>&1)" || fail "recommendation with many tags failed on run $i: $output"
+  [[ "$output" == *'state=recommended'* && "$output" == *'version=v1.3.0'* ]] || fail "many-tags recommendation mismatch on run $i: $output"
+done
+printf 'PASS: many tags do not break latest-version lookup\n'

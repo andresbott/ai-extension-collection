@@ -288,7 +288,14 @@ run() {
   }
   kv() { printf '%s\n' "$out" | sed -n "s/^$1=//p" | tail -n 1; }
   # The last step's report, else the last error it logged.
-  why() { local r; r="$(kv report)"; printf '%s' "${r:-$(log_error "$log" "$mark")}"; }
+  # A helper that died silently gets its exit status instead of no reason at all.
+  why() {
+    local r; r="$(kv report)"; r="${r:-$(log_error "$log" "$mark")}"
+    if [[ "$st" == error && "$rc" -ne 0 && "$r" == 'no reason was given; see the log' ]]; then
+      r="the helper exited with status $rc without a reason; see the log"
+    fi
+    printf '%s' "$r"
+  }
   # What a stage does, for the result line.
   stage_action() {
     case "$1" in
@@ -508,7 +515,7 @@ tag_options() {
 tag_cmd() {
   local version="${1:-}" primary log out st report
   [[ -n "$version" ]] || fail "usage: ship.sh tag <version>"
-  primary="$(git worktree list --porcelain | awk '/^worktree / { print substr($0, 10); exit }')"
+  primary="$(git worktree list --porcelain | awk '/^worktree / && !found { print substr($0, 10); found = 1 }')"
   log="$(mktemp "${TMPDIR:-/tmp}/gitauto-tag.XXXXXX")"
   out="$("$D/gitauto-tag.sh" "version=$version" remote=origin "worktree=${primary:-.}" 2>> "$log")"
   printf '%s\n' "$out" >> "$log"
