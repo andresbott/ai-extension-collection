@@ -12,7 +12,7 @@ gitauto_resolve_default_branch() {
     return 0
   fi
 
-  branch="$(git ls-remote --symref "$remote" HEAD 2>/dev/null | awk '$1 == "ref:" { sub("refs/heads/", "", $2); print $2; exit }')"
+  branch="$(git ls-remote --symref "$remote" HEAD 2>/dev/null | awk '$1 == "ref:" && !found { sub("refs/heads/", "", $2); print $2; found = 1 }')"
   if [[ -n "$branch" ]]; then
     printf '%s\n' "$branch"
     return 0
@@ -64,7 +64,7 @@ gitauto_remote_host() {
   host="${host%%/*}"; host="${host##*@}"; host="${host%%:*}"
   [[ -n "$host" ]] || return 1
   if [[ "$ssh" == yes ]] && command -v ssh >/dev/null 2>&1; then
-    real="$(ssh -G "$host" </dev/null 2>/dev/null | awk '$1 == "hostname" { print $2; exit }' || true)"
+    real="$(ssh -G "$host" </dev/null 2>/dev/null | awk '$1 == "hostname" && !found { print $2; found = 1 }' || true)"
     host="${real:-$host}"
   fi
   printf '%s\n' "$host"

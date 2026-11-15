@@ -42,7 +42,7 @@ if ! git -C "$worktree" fetch "$remote" "$branch" >/dev/null 2>&1 || [[ "$(git -
   exit 0
 fi
 
-latest="$(git -C "$worktree" tag --list --sort=-v:refname | awk '/^v?[0-9]+\.[0-9]+\.[0-9]+$/ { print; exit }')"
+latest="$(git -C "$worktree" tag --list --sort=-v:refname | awk '/^v?[0-9]+\.[0-9]+\.[0-9]+$/ && !found { print; found = 1 }')"
 prefix='v'
 latest_core='0.0.0'
 if [[ -n "$latest" ]]; then

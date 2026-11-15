@@ -10,7 +10,7 @@ for arg in "$@"; do
   esac
 done
 
-primary="$(git worktree list --porcelain | awk '/^worktree / { print substr($0, 10); exit }')"
+primary="$(git worktree list --porcelain | awk '/^worktree / && !found { print substr($0, 10); found = 1 }')"
 if [[ -z "$primary" || ! -d "$primary" ]]; then
   printf 'state=failed\nbranch=\nsha=\nworktree=\nreport=primary worktree could not be resolved\n'
   exit 2
@@ -25,7 +25,7 @@ if [[ -z "$main" ]]; then
   main="${ref#refs/remotes/$remote/}"
 fi
 if [[ -z "$main" ]]; then
-  main="$(git -C "$primary" ls-remote --symref "$remote" HEAD 2>/dev/null | awk '$1 == "ref:" { sub("refs/heads/", "", $2); print $2; exit }')"
+  main="$(git -C "$primary" ls-remote --symref "$remote" HEAD 2>/dev/null | awk '$1 == "ref:" && !found { sub("refs/heads/", "", $2); print $2; found = 1 }')"
 fi
 [[ -n "$main" ]] || main=main
 

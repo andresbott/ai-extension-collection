@@ -40,7 +40,7 @@ fi
 
 worktree_path="$(git worktree list --porcelain | awk -v target="refs/heads/$branch" '
   /^worktree / { path = substr($0, 10) }
-  /^branch / && $2 == target { print path; exit }
+  /^branch / && $2 == target && !found { print path; found = 1 }
 ')"
 worktree_state=absent
 if [[ -n "$worktree_path" ]]; then
