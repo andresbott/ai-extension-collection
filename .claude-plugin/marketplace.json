@@ -6,7 +6,7 @@
     "email": "contact@andresbott.com"
   },
   "description": "Claude Code extensions marketplace",
-  "version": "0.31.1",
+  "version": "0.32.0",
   "plugins": [
     {
       "name": "architects",
@@ -22,6 +22,11 @@
       "name": "doc-authoring",
       "source": "./plugins/doc-authoring",
       "description": "Skills for maintaining internal, agent-facing project documentation."
+    },
+    {
+      "name": "factory",
+      "source": "./plugins/factory",
+      "description": "Unattended delivery commands over TODO.md: /next-iteration groups the items under \"Next iteration\" by complexity, has independent subagents settle open questions and asks you only the rest, then builds them with specialized subagents and commits on the current branch."
     },
     {
       "name": "gitauto",
