@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "factory",
-  "description": "Unattended delivery commands that work through planned work in the todo list, only through the todo binary. /next-iteration implements every task in state ready, plus followup tasks an expert subagent can clear without the user: it groups them by complexity, has independent subagents settle open questions up front, asks the user only the ones they cannot decide, then builds them with specialized subagents, moves each task through working, review, and done or followup as it goes, and commits on the current branch.",
-  "version": "0.2.1",
+  "description": "Unattended delivery commands that work through planned work in the todo list, only through the todo binary. /next-iteration implements every task in state ready, plus followup tasks an expert subagent can clear without the user: it groups them by complexity, has independent subagents settle open questions up front, asks the user only the ones they cannot decide, then builds them with specialized subagents, moves each task through working, review, and done or followup as it goes, and commits on the current branch. /review-pr checks a GitHub pull request out into a separate git worktree, picks reviewer subagents for the areas it touches, merges and verifies their findings, and prints the result as one review (a short summary plus inline comments on the diff), without posting it. An exhaustive mode runs three independent reviewer teams and keeps only what two of them found, or a confirmed blocker.",
+  "version": "0.3.0",
   "author": {
     "name": "Andres Bott",
     "email": "contact@andresbott.com"

@@ -6,7 +6,7 @@
     "email": "contact@andresbott.com"
   },
   "description": "Claude Code extensions marketplace",
-  "version": "0.32.2",
+  "version": "0.33.0",
   "plugins": [
     {
       "name": "architects",
@@ -26,7 +26,7 @@
     {
       "name": "factory",
       "source": "./plugins/factory",
-      "description": "Unattended delivery commands over TODO.md: /next-iteration groups the items under \"Next iteration\" by complexity, has independent subagents settle open questions and asks you only the rest, then builds them with specialized subagents and commits on the current branch."
+      "description": "Unattended delivery commands over TODO.md: /next-iteration groups the items under \"Next iteration\" by complexity, has independent subagents settle open questions and asks you only the rest, then builds them with specialized subagents and commits on the current branch. /review-pr checks a pull request out into its own worktree, has reviewers picked for its areas review it, verifies and anchors their findings, and prints the review as a summary plus inline comments; its exhaustive mode runs three independent teams and keeps only shared findings or confirmed blockers."
     },
     {
       "name": "gitauto",
