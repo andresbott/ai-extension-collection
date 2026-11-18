@@ -26,10 +26,7 @@ as settled rulings.
 
 ## The todo binary
 
-The binary is `/usr/local/bin/todo-08-rc1`. Below, `todo` stands for that
-path: always call it by that full path. (This is a test build; once the
-final version is installed, the path becomes `/usr/local/bin/todo`, and this
-line is the only one to change.)
+The binary is `todo`, as found on `PATH`, version 0.8 or later.
 
 - **Only through the binary.** Every read and every change to the list goes
   through it. Never open, parse, or edit `.todo.json` (or `TODO.md`) yourself,
@@ -134,8 +131,11 @@ When it happens:
 1. Check the branch. If it is `main` or `master`, add "which branch should I
    work on?" to the questions in step 1, and do not commit until it is
    answered.
-2. Check the binary: if `todo --version` fails, tell the user and stop. Check
-   that the list file exists; if it does not, tell the user and stop without
+2. Check the binary: run `todo --version`, which prints `todo version
+   X.Y.Z` (possibly with a suffix such as `-rc1`). If it fails, or the
+   version is below 0.8 (compare major, then minor; ignore any suffix), tell
+   the user the version found and that the skill needs todo 0.8 or later on
+   `PATH`, and stop. Check that the list file exists; if it does not, tell the user and stop without
    running any other `todo` command, since the binary would create one.
 3. Run `todo list --json`. Take every task in state `ready` or `followup`,
    wherever it sits, with its subtasks. Ignore every other state. If there

@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "factory",
   "description": "Unattended delivery commands that work through planned work in the todo list, only through the todo binary. /next-iteration implements every task in state ready, plus followup tasks an expert subagent can clear without the user: it groups them by complexity, has independent subagents settle open questions up front, asks the user only the ones they cannot decide, then builds them with specialized subagents, moves each task through working, review, and done or followup as it goes, and commits on the current branch.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "author": {
     "name": "Andres Bott",
     "email": "contact@andresbott.com"
