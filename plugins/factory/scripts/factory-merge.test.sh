@@ -18,6 +18,7 @@ new_fixture() {
 #!/usr/bin/env bash
 set -euo pipefail
 printf '%s\n' "$*" >> "$GH_LOG"
+[[ -z "${GH_HINT:-}" ]] || printf '%s\n' 'hint: if you need to wait for this pull request to be reviewed, merged, or closed before continuing, use this instead of' 'polling:' '  gh event listen' >&2
 case "${1:-} ${2:-}" in
   'pr view')
     case "${GH_SCENARIO:-open}" in
@@ -114,3 +115,15 @@ new_fixture feat/merge
 output="$( (cd "$repo" && PATH="$bin:$PATH" GH_LOG="$log" GH_SCENARIO=open GH_CHECKS=none "$MERGE_SCRIPT" 'pr=42' 'subject=feat: add feature') 2>&1)" || fail "no-checks merge failed: $output"
 [[ "$output" == *'state=merged'* ]] || fail "explicit no-checks response did not allow merge: $output"
 printf 'PASS: explicit no-checks response remains mergeable\n'
+
+for scenario in open:merged missing:blocked; do
+  new_fixture feat/merge
+  output="$( (cd "$repo" && PATH="$bin:$PATH" GH_LOG="$log" GH_HINT=1 GH_SCENARIO="${scenario%%:*}" "$MERGE_SCRIPT" 'pr=42' 'subject=feat: add feature') 2>&1)" || fail "${scenario%%:*} PR with a gh hint should return safely: $output"
+  [[ "$output" == *"state=${scenario#*:}"* ]] || fail "a gh hint on stderr changed the ${scenario%%:*} outcome: $output"
+done
+new_fixture feat/merge
+set +e
+output="$( (cd "$repo" && PATH="$bin:$PATH" GH_LOG="$log" GH_HINT=1 GH_SCENARIO=down FACTORY_GH_RETRY_DELAY=0 "$MERGE_SCRIPT" 'pr=42' 'subject=feat: add feature') 2>&1)"
+set -e
+[[ "$output" == *'report=pull request lookup failed: HTTP 502: Bad Gateway'* ]] || fail "a gh hint hid the lookup error: $output"
+printf 'PASS: a gh hint on stderr is not read as the PR lookup\n'

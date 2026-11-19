@@ -5,6 +5,8 @@
 # gets a 404. Each call is logged with its token to `tokens`.
 s="$FAKE_GH"; printf '%s\n' "$*" >> "$s/log"
 printf '%s\t%s\n' "${GH_TOKEN:-${GH_ENTERPRISE_TOKEN:-}}" "$*" >> "$s/tokens"
+# hint: gh 2.105+ prints a multi-line hint on stderr and still exits 0.
+[[ ! -f "$s/hint" ]] || printf '%s\n' 'hint: if you need to wait for this pull request to be reviewed, merged, or closed before continuing, use this instead of' 'polling:' '  gh event listen' >&2
 json=''; jq=''; hostname=github.com; user=''; prev=''
 for a in "$@"; do
   case "$prev" in --json) json="$a" ;; --jq) jq="$a" ;; --hostname) hostname="$a" ;; --user) user="$a" ;; esac
