@@ -6,7 +6,7 @@
     "email": "contact@andresbott.com"
   },
   "description": "Claude Code extensions marketplace",
-  "version": "0.33.0",
+  "version": "0.34.0",
   "plugins": [
     {
       "name": "architects",
@@ -16,7 +16,7 @@
     {
       "name": "coding-guides",
       "source": "./plugins/coding-guides",
-      "description": "Injects standing coding conventions into sessions and subagents, enforces selected tool-use rules, and adds /auto-deliver to hand off the rest of a feature, /tldr for short, plain-language summaries, /explain for a numbered walk-through of how code works, and /auto-improve for an unattended review-and-fix run on the current branch."
+      "description": "Injects standing coding conventions into sessions and subagents, enforces selected tool-use rules, and adds /tldr for short, plain-language summaries and /explain for a numbered walk-through of how code works."
     },
     {
       "name": "doc-authoring",
@@ -26,12 +26,7 @@
     {
       "name": "factory",
       "source": "./plugins/factory",
-      "description": "Unattended delivery commands over TODO.md: /next-iteration groups the items under \"Next iteration\" by complexity, has independent subagents settle open questions and asks you only the rest, then builds them with specialized subagents and commits on the current branch. /review-pr checks a pull request out into its own worktree, has reviewers picked for its areas review it, verifies and anchors their findings, and prints the review as a summary plus inline comments; its exhaustive mode runs three independent teams and keeps only shared findings or confirmed blockers."
-    },
-    {
-      "name": "gitauto",
-      "source": "./plugins/gitauto",
-      "description": "Token-cheap Git delivery commands backed by bundled scripts, for Claude Code and pi: new-branch, open-pr, and ship (an expensive PR writer only for complex changes), plus a generate-readme skill for README.md and DEVELOPMENT.md."
+      "description": "Delivery commands from writing code to merging it. /auto-deliver hands off the rest of a feature, /auto-improve runs an unattended review-and-fix pass on the current branch, /next-iteration builds the ready tasks from the todo list, and /review-pr prints a multi-reviewer review of a pull request without posting it. Token-cheap, script-backed Git commands (/new-branch, /open-pr, /ship) branch, open the PR, wait for CI, and merge, using an expensive PR writer only for complex changes. /generate-readme writes the root README.md and DEVELOPMENT.md."
     },
     {
       "name": "go-idioms",

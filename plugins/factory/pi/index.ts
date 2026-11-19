@@ -1,0 +1,242 @@
+// factory for pi: registers /factory:new-branch, /factory:open-pr, and
+// /factory:ship. The flows (flow.ts) are harness-free; this file binds them to
+// pi: the bundled scripts, nested model calls, the account and tag questions,
+// and progress.
+//
+// It also registers the prompt commands (/factory:auto-deliver, and so on):
+// each sends its shared Claude Code command file (commands/<name>.md) to the
+// session as the user's message, with the plugin root and arguments filled in.
+//
+// Models, as in Claude Code (haiku for the command, sonnet for pr-writer):
+// - simple texts (branch names, messages, small PR texts, failure diagnosis) use
+//   a cheap model picked by ./models.ts, falling back to the session's model;
+// - complex PR titles and bodies, written by the pr-writer expert, use the
+//   session's model: the stronger model the user chose. If it saves no draft
+//   (a failure or a refusal), the cheap writer takes over.
+// FACTORY_CHEAP_MODEL / FACTORY_EXPERT_MODEL (`provider/id` or a bare id)
+// optionally override either role.
+import { execFileSync, spawn } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+
+import { newBranch, ship, type Deps, type Script, type ScriptResult } from "./flow.ts";
+import { findModel, pickCheapModel } from "./models.ts";
+import { WRITE_SYSTEM_PROMPT, expandCommand, frontmatterField, parseTexts, stripFrontmatter } from "./protocol.ts";
+
+const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
+const SCRIPTS = join(ROOT, "scripts");
+const PR_WRITER = join(ROOT, "agents", "pr-writer.md");
+const COMMAND_FILES = join(ROOT, "commands");
+
+// Pi has no tool-call cap, so one run may wait on CI far longer than Claude's 540s.
+const RUN_BUDGET = "3600";
+const EXPERT_TIMEOUT_MS = 15 * 60_000;
+const EXPERT_TOOLS = "read,grep,find,ls,bash";
+const DIAGNOSE_PROMPT = "In one sentence, name the most likely cause of this failure. Do not suggest or attempt a fix.";
+const WIDGET = "factory";
+const WIDGET_LINES = 8;
+
+type Model = NonNullable<ExtensionCommandContext["model"]>;
+type Flow = (deps: Deps, args: string) => Promise<string>;
+
+const COMMANDS: [name: string, description: string, flow: Flow][] = [
+  ["new-branch", "Move off main/master onto a feature branch (no-op on a feature branch)", newBranch],
+  [
+    "open-pr",
+    "Open (or reuse) a PR and wait for green CI: branch, verify, commit, push, open PR, watch CI. Never merges.",
+    (deps, args) => ship(deps, args, "pr"),
+  ],
+  [
+    "ship",
+    "Ship the current work: branch, verify, commit, push, PR, CI, squash-merge, sync, clean up, then offer a tag. Args: [branch] [tag=<semver> | no tag] [deleteRemote=true]",
+    (deps, args) => ship(deps, args, "ship"),
+  ],
+];
+
+/** Commands the session model carries out: the command file is the prompt. */
+const PROMPT_COMMANDS = ["auto-deliver", "auto-improve", "next-iteration", "review-pr"];
+
+export default function factory(pi: ExtensionAPI) {
+  for (const name of PROMPT_COMMANDS) {
+    const file = join(COMMAND_FILES, `${name}.md`);
+    pi.registerCommand(`factory:${name}`, {
+      description: frontmatterField(readFileSync(file, "utf8"), "description") ?? name,
+      handler: async (args, ctx) => {
+        await ctx.waitForIdle();
+        pi.sendUserMessage(expandCommand(readFileSync(file, "utf8"), ROOT, args.trim()));
+      },
+    });
+  }
+
+  let busy = false;
+  for (const [name, description, flow] of COMMANDS) {
+    pi.registerCommand(`factory:${name}`, {
+      description,
+      handler: async (args, ctx) => {
+        if (busy) {
+          ctx.ui.notify("factory is already running", "warning");
+          return;
+        }
+        busy = true;
+        const progress = new Progress(ctx);
+        let report: string;
+        try {
+          await ctx.waitForIdle();
+          report = await flow(makeDeps(ctx, progress), args.trim());
+        } catch (err) {
+          report = `error: ${err instanceof Error ? err.message : String(err)}`;
+          ctx.ui.notify(`factory:${name} ${report}`, "error");
+        } finally {
+          progress.clear();
+          busy = false;
+        }
+        // Into the session, so the user can ask the model about a failure afterwards.
+        pi.sendMessage({ customType: "factory", content: `**/factory:${name}**\n\n${report}`, display: true });
+      },
+    });
+  }
+}
+
+/** The last few progress lines, shown in a widget while a command runs. */
+class Progress {
+  private lines: string[] = [];
+  private ctx: ExtensionCommandContext;
+  constructor(ctx: ExtensionCommandContext) {
+    this.ctx = ctx;
+  }
+  add(line: string) {
+    this.lines.push(line);
+    this.ctx.ui.setWidget(WIDGET, this.lines.slice(-WIDGET_LINES));
+  }
+  clear() {
+    this.ctx.ui.setWidget(WIDGET, undefined);
+  }
+}
+
+function makeDeps(ctx: ExtensionCommandContext, progress: Progress): Deps {
+  return {
+    script: (name, args, opts) =>
+      runScript(ctx.cwd, name, args, opts, (line) => line.startsWith("ship:") && progress.add(line)),
+    write: async (context, keys) => {
+      const model = resolveModel(ctx, "FACTORY_CHEAP_MODEL");
+      progress.add(`factory: writing with ${model.provider}/${model.id}`);
+      const reply = await complete(ctx, model, WRITE_SYSTEM_PROMPT, context);
+      return parseTexts(reply, keys);
+    },
+    expert: (base) => runExpert(ctx, base),
+    select: async (title, options) => (ctx.hasUI ? ctx.ui.select(title, options) : undefined),
+    diagnose: async (failure) => {
+      try {
+        const cause = await complete(ctx, resolveModel(ctx, "FACTORY_CHEAP_MODEL"), DIAGNOSE_PROMPT, failure);
+        return cause.trim() || undefined;
+      } catch {
+        return undefined;
+      }
+    },
+    progress: (note) => progress.add(`factory: ${note}`),
+  };
+}
+
+/** Run a bundled script; stdout lines stream to onLine as they arrive. */
+function runScript(
+  cwd: string,
+  name: Script,
+  args: string[],
+  opts: { stdin?: string; env?: Record<string, string> } | undefined,
+  onLine: (line: string) => void,
+): Promise<ScriptResult> {
+  return new Promise((resolve, reject) => {
+    const env = { ...process.env, FACTORY_CMD_RUN_BUDGET: process.env.FACTORY_CMD_RUN_BUDGET ?? RUN_BUDGET, ...opts?.env };
+    const child = spawn("bash", [join(SCRIPTS, name), ...args], { cwd, env });
+    let out = "";
+    let err = "";
+    let partial = "";
+    child.stdout.on("data", (chunk: Buffer) => {
+      const text = chunk.toString();
+      out += text;
+      const lines = (partial + text).split("\n");
+      partial = lines.pop() ?? "";
+      lines.forEach(onLine);
+    });
+    child.stderr.on("data", (chunk: Buffer) => (err += chunk.toString()));
+    child.on("error", reject);
+    child.on("close", (code) => resolve({ code: code ?? 1, out: out || err }));
+    child.stdin.end(opts?.stdin ?? "");
+  });
+}
+
+/**
+ * The model for a cheap nested call: the env override if set, else a cheap
+ * available model (see ./models.ts), else the session's model.
+ */
+function resolveModel(ctx: ExtensionCommandContext, envName: string): Model {
+  const available = ctx.modelRegistry.getAvailable();
+  const spec = process.env[envName]?.trim();
+  if (spec) {
+    const model = findModel(available, spec);
+    if (!model) throw new Error(`${envName}=${spec} is not an available model`);
+    return model;
+  }
+  const model = pickCheapModel(available, ctx.model?.provider) ?? ctx.model;
+  if (!model) throw new Error(`no model available; select one or set ${envName}`);
+  return model;
+}
+
+async function complete(ctx: ExtensionCommandContext, model: Model, systemPrompt: string, text: string) {
+  const res = await ctx.modelRegistry.complete(model, {
+    systemPrompt,
+    messages: [{ role: "user", content: [{ type: "text", text }], timestamp: Date.now() }],
+  });
+  if (res.stopReason === "error" || res.stopReason === "aborted") {
+    throw new Error(res.errorMessage ?? `the model call ended with ${res.stopReason}`);
+  }
+  return res.content.flatMap((c) => (c.type === "text" ? [c.text] : [])).join("\n");
+}
+
+/** A one-shot pi process with the shared pr-writer prompt; it saves the draft itself. */
+async function runExpert(ctx: ExtensionCommandContext, base: string): Promise<boolean> {
+  // The stronger model, not the cheap one: the override, else the session's model.
+  const model = process.env.FACTORY_EXPERT_MODEL?.trim() || (ctx.model && `${ctx.model.provider}/${ctx.model.id}`);
+  const args = [
+    "--print",
+    "--no-session",
+    "--no-extensions",
+    "--no-skills",
+    "--no-prompt-templates",
+    "--no-approve",
+    "--tools",
+    EXPERT_TOOLS,
+    "--append-system-prompt",
+    stripFrontmatter(readFileSync(PR_WRITER, "utf8")),
+    ...(model ? ["--model", model] : []),
+    `Base: ${base}. Draft command: ${join(SCRIPTS, "ship.sh")} draft`,
+  ];
+  const [cmd, ...pre] = piCommand();
+  await new Promise<void>((resolve) => {
+    const child = spawn(cmd, [...pre, ...args], { cwd: ctx.cwd, stdio: "ignore", timeout: EXPERT_TIMEOUT_MS });
+    child.on("error", () => resolve());
+    child.on("close", () => resolve());
+  });
+  return draftSaved(ctx.cwd);
+}
+
+/** The pi that is running this extension, so the expert uses the same install. */
+function piCommand(): string[] {
+  if (process.env.FACTORY_PI_BIN) return [process.env.FACTORY_PI_BIN];
+  const cli = process.argv[1];
+  if (cli && /^node(\.exe)?$/i.test(basename(process.execPath)) && existsSync(cli)) return [process.execPath, cli];
+  return ["pi"];
+}
+
+/** ship.sh draft writes the title into <git-dir>/factory/. */
+function draftSaved(cwd: string): boolean {
+  try {
+    const gitDir = execFileSync("git", ["rev-parse", "--absolute-git-dir"], { cwd, encoding: "utf8" }).trim();
+    return existsSync(join(gitDir, "factory", "title"));
+  } catch {
+    return false;
+  }
+}

@@ -3,7 +3,7 @@
 # coding guides from context/. hooks.json registers one call per file, because
 # Claude Code swaps any additionalContext over 10,000 characters for a file path
 # and a short preview. The session gets every file; subagents get the ones about
-# writing code, except the built-in agents that never write code and gitauto's
+# writing code, except the built-in agents that never write code and factory's
 # read-only pr-writer, whose prompt carries every rule it needs.
 #
 #   Usage: inject-guides.sh <SessionStart|SubagentStart> <file in context/>
@@ -21,7 +21,7 @@ file="${dir}/../context/$2"
 # Agents that only search, plan, configure, or write PR texts: they get no guides.
 skipped_agent() {
   case "$1" in
-    Explore | Plan | claude-code-guide | statusline-setup | gitauto:pr-writer) return 0 ;;
+    Explore | Plan | claude-code-guide | statusline-setup | factory:pr-writer) return 0 ;;
     *) return 1 ;;
   esac
 }
