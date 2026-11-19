@@ -1,7 +1,7 @@
 # Delivery engine
 
 The shared process behind the factory's delivery commands (`next-iteration`,
-`auto-deliver`). The command that sent you here is the **entry point**: it says
+`auto-deliver`, and the fixes after `review-branch`). The command that sent you here is the **entry point**: it says
 where the tasks come from and how to record them. This file says how to build
 them. The entry point only adds steps or fills in what is listed under "What
 the entry point provides"; it never relaxes the rules here.
