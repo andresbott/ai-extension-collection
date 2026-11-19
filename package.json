@@ -1,19 +1,19 @@
 {
   "name": "ai-extension-collection",
-  "version": "0.18.3",
+  "version": "0.19.0",
   "private": true,
   "description": "Pi package for the ai-extension-collection plugins that ship a pi adapter, pi-only extension, pi agents (plugins/<name>/pi/), or Agent Skills (plugins/<name>/skills/).",
   "type": "module",
   "keywords": ["pi-package"],
   "scripts": {
-    "test": "bash plugins/gitauto/scripts/run-tests.sh && bash plugins/coding-guides/hooks/coding-guides-pre-tool-use.test.sh && bash plugins/coding-guides/hooks/inject-guides.test.sh && npm run test:pi",
+    "test": "bash plugins/factory/scripts/run-tests.sh && bash plugins/coding-guides/hooks/coding-guides-pre-tool-use.test.sh && bash plugins/coding-guides/hooks/inject-guides.test.sh && npm run test:pi",
     "test:pi": "node --test plugins/*/pi/*.test.ts libs/*/*.test.ts",
     "typecheck": "tsc -p tsconfig.json"
   },
   "pi": {
     "extensions": [
       "./plugins/coding-guides/pi/index.ts",
-      "./plugins/gitauto/pi/index.ts",
+      "./plugins/factory/pi/index.ts",
       "./plugins/pi-clear/pi/index.ts",
       "./plugins/pi-clear-on-exit/pi/index.ts",
       "./plugins/pi-context/pi/index.ts",
@@ -26,7 +26,6 @@
       "./plugins/coding-guides/skills",
       "./plugins/doc-authoring/skills",
       "./plugins/factory/skills",
-      "./plugins/gitauto/skills",
       "./plugins/go-idioms/skills"
     ],
     "subagents": {

@@ -51,10 +51,15 @@ follow the defaults:
   it or approved it in the current session. Committing does not imply permission
   to push — after committing, stop and report. Never add `git push` to the
   allow list.
-- **The user runs gitauto, never you.** Do not start `/gitauto:ship`,
-  `/gitauto:open-pr`, or `/gitauto:new-branch`, or their scripts, on your own,
-  and do not offer to: not as a question ("should I ship it?"), and not folded
-  into a bundle ("should I fix X, update Y, and ship?") where one "yes"
-  approves the run. When the work is ready, say so and stop; the user starts
-  gitauto. Follow a gitauto command only when the user typed it. Plain git the
-  user asks for (commit, switch branches) is unaffected.
+- **The user runs the factory git commands, never you.** Do not start
+  `/factory:ship`, `/factory:open-pr`, or `/factory:new-branch`, or their
+  scripts, on your own, and do not offer to: not as a question ("should I ship
+  it?"), and not folded into a bundle ("should I fix X, update Y, and ship?")
+  where one "yes" approves the run. When the work is ready, say so and stop;
+  the user starts them. Follow one of these commands only when the user typed
+  it. Plain git the user asks for (commit, switch branches) is unaffected.
+  The one exception: when the user started the factory's `next-iteration`,
+  `auto-deliver`, or `auto-improve` skill, run its new-branch step as the
+  skill says. That step
+  is how those skills leave `main`/`master`, and it overrides the rules above
+  against creating or switching branches yourself for that run only.
