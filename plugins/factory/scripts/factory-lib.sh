@@ -112,6 +112,18 @@ factory_export_account() {
   export "$var=$token"
 }
 
+# Run a gh command (`factory_gh_capture gh ...` or `... env VAR=x gh ...`) with
+# its stdout and stderr kept apart, so a notice gh prints on stderr (gh 2.105+
+# adds a multi-line hint to every `pr view`, and still exits 0) is never parsed
+# as its output. Sets gh_out, gh_err, and gh_status; always returns 0.
+factory_gh_capture() {
+  local err
+  err="$(mktemp "${TMPDIR:-/tmp}/factory-gh.XXXXXX")"
+  if gh_out="$("$@" 2>"$err")"; then gh_status=0; else gh_status=$?; fi
+  gh_err="$(cat "$err")"
+  rm -f "$err"
+}
+
 # The one line of a gh error worth reporting: its last non-empty line, trimmed.
 factory_gh_error() {
   local line

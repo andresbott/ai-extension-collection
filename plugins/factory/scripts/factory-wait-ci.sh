@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/factory-lib.sh"
 
 pr="${1:-}"
 pr="${pr#pr=}"
@@ -42,17 +44,14 @@ while :; do
     sleep "${FACTORY_CHECKS_GRACE_INTERVAL:-5}"
     continue
   fi
-  set +e
-  buckets="$(gh pr checks "$pr" --json bucket --jq '.[].bucket' 2>&1)"
-  bstatus=$?
-  set -e
-  if [[ $bstatus -eq 0 ]]; then
-    grep -qxE 'fail|cancel' <<< "$buckets" && break
-    grep -qx pending <<< "$buckets" || { status=0; break; }
+  factory_gh_capture gh pr checks "$pr" --json bucket --jq '.[].bucket'
+  [[ -z "$gh_err" ]] || printf '%s\n' "$gh_err" >&2
+  if [[ $gh_status -eq 0 ]]; then
+    grep -qxE 'fail|cancel' <<< "$gh_out" && break
+    grep -qx pending <<< "$gh_out" || { status=0; break; }
     error="$(tail -n 1 <<< "$summary")"
   else
-    printf '%s\n' "$buckets" >&2
-    error="$(tail -n 1 <<< "$buckets")"
+    error="$(tail -n 1 <<< "$gh_err")"
   fi
   if (( ++errors > retries )); then
     printf 'state=error\nnumber=%s\nreport=could not read CI status (%s); re-run to resume\n' "$pr" "${error:-gh exited $status}"

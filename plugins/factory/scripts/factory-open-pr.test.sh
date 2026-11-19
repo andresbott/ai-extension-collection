@@ -23,6 +23,7 @@ new_fixture() {
 #!/usr/bin/env bash
 set -euo pipefail
 printf '%s %s\n' "${1:-}" "${2:-}" >> "$GH_LOG"
+[[ -z "${GH_HINT:-}" ]] || printf '%s\n' 'hint: if you need to wait for this pull request to be reviewed, merged, or closed before continuing, use this instead of' 'polling:' '  gh event listen' >&2
 case "${1:-} ${2:-}" in
   # GH_AUTH_ONLY: the one host with a working login; a wider check fails.
   'auth status') [[ -z "${GH_AUTH_ONLY:-}" || "$*" == "auth status --hostname $GH_AUTH_ONLY" ]] ;;
@@ -126,3 +127,14 @@ status=$?
 set -e
 [[ $status -ne 0 && "$output" == *'report=GitHub CLI is unavailable or unauthenticated'* ]] || fail "origin host without a login passed: status=$status output=$output"
 printf 'PASS: gh auth is checked for the origin host only\n'
+
+new_fixture feat/hint
+output="$( (cd "$repo" && PATH="$bin:$PATH" GH_LOG="$log" GH_HINT=1 GH_SCENARIO=open "$OPEN_PR_SCRIPT") 2>&1)" || fail "open PR with a gh hint failed: $output"
+[[ "$output" == *'state=reused'* && "$output" == *'number=42'* && "$output" == *'url=https://example.invalid/pr/42'* ]] || fail "a gh hint on stderr stopped the reuse: $output"
+set +e
+output="$( (cd "$repo" && PATH="$bin:$PATH" GH_LOG="$log" GH_HINT=1 GH_SCENARIO=error "$OPEN_PR_SCRIPT" 'title=x' 'body=y') 2>&1)"
+set -e
+[[ "$output" == *'report=pull request lookup failed: network unavailable'* ]] || fail "a gh hint hid the lookup error: $output"
+output="$( (cd "$repo" && PATH="$bin:$PATH" GH_LOG="$log" GH_HINT=1 GH_SCENARIO=none EXPECT_BASE=main EXPECT_HEAD=feat/hint EXPECT_TITLE=x EXPECT_BODY=y "$OPEN_PR_SCRIPT" 'title=x' 'body=y' 'base=main') 2>&1)" || fail "missing PR with a gh hint was not created: $output"
+[[ "$output" == *'state=created'* ]] || fail "a gh hint stopped PR creation: $output"
+printf 'PASS: a gh hint on stderr is not read as the PR lookup\n'

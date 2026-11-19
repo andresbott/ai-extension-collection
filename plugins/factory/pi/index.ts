@@ -57,7 +57,7 @@ const COMMANDS: [name: string, description: string, flow: Flow][] = [
 ];
 
 /** Commands the session model carries out: the command file is the prompt. */
-const PROMPT_COMMANDS = ["auto-deliver", "auto-improve", "next-iteration", "review-pr"];
+const PROMPT_COMMANDS = ["auto-deliver", "auto-improve", "next-iteration", "review-branch", "review-pr"];
 
 export default function factory(pi: ExtensionAPI) {
   for (const name of PROMPT_COMMANDS) {

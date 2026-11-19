@@ -70,12 +70,13 @@ probe_error=''
 can_push() {
   local token res
   token="$(gh auth token --hostname "$host" --user "$1" 2>/dev/null)" || { probe_error="$1: gh has no token"; return 2; }
-  if res="$(env "$var=$token" gh api --hostname "$host" "repos/$repo" --jq '.permissions.push' 2>&1)"; then
-    [[ "$res" == true ]]
+  factory_gh_capture env "$var=$token" gh api --hostname "$host" "repos/$repo" --jq '.permissions.push'
+  if [[ $gh_status -eq 0 ]]; then
+    [[ "$gh_out" == true ]]
     return
   fi
-  grep -qE 'HTTP 4[0-9][0-9]' <<< "$res" && return 1
-  probe_error="$1: $(factory_gh_error "$res")"
+  grep -qE 'HTTP 4[0-9][0-9]' <<< "$gh_err" && return 1
+  probe_error="$1: $(factory_gh_error "$gh_err")"
   return 2
 }
 

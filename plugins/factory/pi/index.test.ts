@@ -92,6 +92,7 @@ test("registers the factory commands", () => {
     "factory:auto-deliver",
     "factory:auto-improve",
     "factory:next-iteration",
+    "factory:review-branch",
     "factory:review-pr",
     "factory:new-branch",
     "factory:open-pr",
@@ -108,6 +109,19 @@ test("a prompt command sends its command file with the plugin root and arguments
   assert.ok(!pi.userMessages[0].includes("CLAUDE_PLUGIN_ROOT"), "no unresolved plugin root");
   assert.ok(!pi.userMessages[0].startsWith("---"), "frontmatter stripped");
   assert.match(pi.userMessages[0], /\n\nARGUMENTS: -f other\.json$/);
+});
+
+test("the review commands resolve the review engine, and review-branch the delivery engine too", async () => {
+  const pi = load(tmpdir(), "");
+  const root = dirname(dirname(fileURLToPath(import.meta.url)));
+  await pi.run("factory:review-pr", "12");
+  await pi.run("factory:review-branch");
+  assert.equal(pi.userMessages.length, 2);
+  for (const message of pi.userMessages) {
+    assert.ok(message.includes(`${root}/references/review-engine.md`), "review engine path resolved");
+    assert.ok(!message.includes("CLAUDE_PLUGIN_ROOT"), "no unresolved plugin root");
+  }
+  assert.ok(pi.userMessages[1].includes(`${root}/references/delivery-engine.md`), "delivery engine path resolved");
 });
 
 test("/factory:new-branch names the branch with the model and creates it", async () => {

@@ -320,6 +320,24 @@ grep -q '^SHIP ' <<<"$out" || fail "the SSH key should decide: $out"
 [[ "$(jq -r .account "$repo/.git/factory.json")" == a ]] || fail "the SSH pick was not saved"
 pass "run never asks; the SSH key's account is picked without a question"
 
+# gh 2.105+ prints a multi-line hint on stderr for every call and exits 0.
+github_fixture
+printf 'a' > "$FAKE_GH/push"
+touch "$FAKE_GH/hint"
+git -C "$repo" switch -qc feat/hint
+printf 'hint\n' >> "$repo/README.md"
+out="$(ship prepare '')"
+grep -q '^SHIP branch=feat/hint .* need=pr writer=cheap$' <<<"$out" || fail "prepare with a gh hint: $out"
+[[ "$(jq -r .account "$repo/.git/factory.json")" == a ]] || fail "a gh hint hid the account that can push"
+out="$(ship open-pr --title 'feat: hint' --body-stdin <<<'body')"
+grep -q '^READY pr=#7 ' <<<"$out" || fail "open-pr with a gh hint: $out"
+out="$(ship open-pr)"
+grep -q '^READY pr=#7 ' <<<"$out" || fail "re-run open-pr with a gh hint did not reuse the PR: $out"
+# The fixture's fetch URL is GitHub's, so the sync after the merge cannot fetch.
+out="$(ship run)"
+grep -q '^ship: \[[0-9]*\] merge -> merged$' <<<"$out" || fail "ship with a gh hint did not merge: $out"
+pass "a gh hint on stderr is never parsed as gh's output"
+
 fixture
 git -C "$repo" switch -qc feat/hidden
 printf 'hidden\n' >> "$repo/README.md"

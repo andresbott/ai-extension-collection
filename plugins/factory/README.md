@@ -12,6 +12,7 @@ command is `/factory:<name>` in both harnesses.
 | `/factory:auto-deliver` | Hands the rest of the feature in the conversation to the agent, which stops only for critical issues. Same engine as `next-iteration`, with the conversation as the task source and no todo list. |
 | `/factory:auto-improve` | Improves the current branch unattended: one subagent reviews, a fresh subagent fixes each finding test-first, complex findings can be planned and landed by subagents, and a second review checks the fixes, all tracked in `TODO.md`. |
 | `/factory:next-iteration` | Builds every task in state `ready` in the todo list (only through the `todo` binary), plus `followup` tasks an expert subagent can clear, and commits on the current branch. Follow-up items found during the run are built in the same run whenever an expert can settle their scope; only those that need the user are left open. |
+| `/factory:review-branch` | Reviews the current branch against its base, uncommitted and untracked work included, with the same reviewers as `review-pr`, and prints the findings. Then offers to fix the chosen ones through the delivery engine, each fix starting from a failing test for the finding's scenario. |
 | `/factory:review-pr` | Reviews a GitHub pull request with reviewer subagents in a separate worktree and prints the review (summary plus inline comments) without posting it. An exhaustive mode runs three independent teams. |
 
 These are prompt commands: `commands/<name>.md` holds the instructions, and
@@ -22,7 +23,11 @@ file's body as the user's message, with `${CLAUDE_PLUGIN_ROOT}` and
 points to one process, `references/delivery-engine.md`: questions qualified
 and asked once, a baseline, specialist implementers, a review per task, and
 plans for complex tasks. Each entry point only says where its tasks come from
-and how it records them.
+and how it records them. `review-pr` and `review-branch` are likewise two
+entry points to `references/review-engine.md`: the mode, the reviewers, and
+merging and verifying their findings. Each says which change to review, what
+it claims to do, and how to print the result; `review-branch` then becomes an
+entry point to the delivery engine for the fixes.
 
 **In pi**, these commands launch subagents, which pi gets from the
 [`pi-subagents`](https://github.com/nicobailon/pi-subagents) extension. Install

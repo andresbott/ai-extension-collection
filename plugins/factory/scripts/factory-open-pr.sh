@@ -32,15 +32,13 @@ if [[ -z "$base" ]]; then
   exit 2
 fi
 
-set +e
-view="$(gh pr view "$branch" --json number,state,url --jq '[.number,.state,.url]|@tsv' 2>&1)"
-view_status=$?
-set -e
-if [[ $view_status -ne 0 ]]; then
-  if printf '%s' "$view" | grep -qiE 'no pull requests found|could not resolve to a PullRequest'; then
+factory_gh_capture gh pr view "$branch" --json number,state,url --jq '[.number,.state,.url]|@tsv'
+view="$gh_out"
+if [[ $gh_status -ne 0 ]]; then
+  if grep -qiE 'no pull requests found|could not resolve to a PullRequest' <<< "$gh_err"; then
     view=''
   else
-    printf 'state=failed\nnumber=\nurl=\nbranch=%s\nreport=pull request lookup failed: %s\n' "$branch" "$(factory_gh_error "$view")"
+    printf 'state=failed\nnumber=\nurl=\nbranch=%s\nreport=pull request lookup failed: %s\n' "$branch" "$(factory_gh_error "$gh_err")"
     exit 2
   fi
 fi
