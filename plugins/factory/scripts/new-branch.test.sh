@@ -38,10 +38,27 @@ pass "feature branch is left unchanged"
 
 new_repo
 out="$(run '')"
+[[ "$(tail -n 1 <<<"$out")" =~ ^DONE\ state=created\ branch=work/[a-z]+-[a-z]+\ from=main$ ]] || fail "random: $out"
+pass "no args on a clean tree creates a random work/ branch without the model"
+
+new_repo
+git -C "$repo" switch -qc work/seed
+git -C "$repo" switch -q main
+names=()
+for i in 1 2 3 4 5 6; do
+  out="$(run '')"
+  names+=("$(sed -n 's/^DONE state=created branch=\([^ ]*\) .*/\1/p' <<<"$out")")
+  git -C "$repo" switch -q main
+done
+[[ "$(printf '%s\n' "${names[@]}" | sort -u | wc -l)" -eq 6 ]] || fail "repeated names: ${names[*]}"
+pass "repeated runs pick distinct names that skip existing branches"
+
+new_repo
+printf 'x\n' > "$repo/new.txt"
+out="$(run '')"
 [[ "$(head -n 1 <<<"$out")" == "NEED_NAME on=main" ]] || fail "need name: $out"
 grep -q -- '^--- write$' <<<"$out" || fail "write block missing: $out"
-grep -q '^branch: 3 distinct' <<<"$out" || fail "branch rule missing: $out"
-printf 'x\n' > "$repo/new.txt"
+grep -q '^branch: 3 distinct.*use work/[a-z]*-[a-z]*\.$' <<<"$out" || fail "branch rule missing: $out"
 out="$(run 'add a login page')"
 grep -q '^NEED_NAME on=main hint=' <<<"$out" || fail "hint: $out"
 grep -q 'new.txt' <<<"$out" || fail "status missing: $out"

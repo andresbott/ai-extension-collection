@@ -13,6 +13,8 @@
 #                                                status lines and a `--- write`
 #                                                block with the naming rule follow
 #
+# With no args and a clean tree there is nothing to name the branch after, so
+# the preflight creates a random free work/<adjective>-<noun> branch itself.
 # When every candidate is taken, -2..-9 suffixes on the first valid one are
 # tried, so the model never needs a second round.
 set -uo pipefail
@@ -36,10 +38,7 @@ if ! factory_is_protected_branch "$current" origin; then
 fi
 
 valid() { git check-ref-format --branch "$1" >/dev/null 2>&1; }
-taken() {
-  git show-ref --verify --quiet "refs/heads/$1" ||
-    git show-ref --verify --quiet "refs/remotes/origin/$1"
-}
+taken() { factory_branch_taken "$1"; }
 
 create() {
   local first="" c n
@@ -78,9 +77,16 @@ if [[ -n "$arg" ]] && valid "$arg"; then
   exit 0
 fi
 
+# Nothing to name it after (no args, clean tree): a random free work/ name.
+status="$(git status --short --untracked-files=all)"
+if [[ -z "$arg" && -z "$status" ]]; then
+  create "$(factory_random_branch)"
+  exit 0
+fi
+
 # Hand the model the smallest useful context.
 printf 'NEED_NAME on=%s' "$current"
 [[ -n "$arg" ]] && printf ' hint=%q' "$arg"
 printf '\n'
-git status --short --untracked-files=all | head -n 25
+[[ -n "$status" ]] && head -n 25 <<<"$status"
 factory_write_rules branch

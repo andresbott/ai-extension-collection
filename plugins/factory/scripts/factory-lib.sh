@@ -146,6 +146,52 @@ factory_gh_authenticated() {
   fi
 }
 
+# A branch exists locally or on origin.
+factory_branch_taken() {
+  git show-ref --verify --quiet "refs/heads/$1" ||
+    git show-ref --verify --quiet "refs/remotes/origin/$1"
+}
+
+# A random work/<adjective>-<noun> name that no local or origin branch uses
+# (about 15,000 combinations; $RANDOM is plenty, nothing here is secret).
+FACTORY_ADJECTIVES=(
+  agile amber ancient arctic azure bold brave breezy bright brisk
+  calm candid clever cobalt cosmic cozy crisp curious daring dapper
+  dashing deft eager early earnest electric elegant emerald epic fabled
+  fancy fearless feisty fierce fluffy fond fresh frosty gentle giant
+  gilded glad gleaming golden graceful grand happy hardy hazy hidden
+  humble icy jade jolly jovial keen kind lively lucky lunar
+  majestic mellow merry mighty misty modest nimble noble novel oaken
+  olive orange patient peppy plucky polar proud quick quiet radiant
+  rapid rosy royal rugged rustic sandy scarlet serene sharp shiny
+  silent silver sleek smooth snowy solar spry steady stellar stormy
+  sturdy sunny swift tidy tranquil trusty velvet vivid warm wild
+  wise witty zany zealous zesty cheerful dusky lofty mossy
+)
+FACTORY_NOUNS=(
+  acorn albatross anchor antelope aurora badger banjo beacon beaver bison
+  blossom boulder breeze brook buffalo cactus canyon cedar cheetah cinder
+  cliff clover comet condor coral cougar crane creek cricket crow
+  dolphin dove dragon dune eagle ember falcon fern finch fjord
+  flame fox galaxy gazelle geyser glacier grove gull harbor hawk
+  hedgehog heron hill horizon iris island jaguar kestrel kite koala
+  lagoon lantern lark lemur lily lion lotus lynx maple marmot
+  meadow meteor mink moose moth nebula newt oak ocelot orchid
+  osprey otter owl panda panther pebble pelican pine planet plume
+  pony prairie puffin quail quartz rabbit raven reef ridge river
+  robin sparrow salmon sequoia shore sparrowhawk spruce squirrel star stream
+  summit swan thistle thunder tiger toucan tulip tundra valley walrus
+  willow wolf wren yak zebra zephyr
+)
+factory_random_branch() {
+  local name i
+  for i in {1..50}; do
+    name="work/${FACTORY_ADJECTIVES[RANDOM % ${#FACTORY_ADJECTIVES[@]}]}-${FACTORY_NOUNS[RANDOM % ${#FACTORY_NOUNS[@]}]}"
+    factory_branch_taken "$name" || break
+  done
+  printf '%s\n' "$name"
+}
+
 # The writing rules for each text a script needs from a model, printed as a
 # `--- write` block with one `<key>: <rule>` line per text. Every harness adapter
 # hands this block to its model unchanged, so the rules live only here.
@@ -156,7 +202,7 @@ factory_write_rules() {
   printf -- '--- write\n'
   for key in "$@"; do
     case "$key" in
-      branch) printf 'branch: 3 distinct, concise, lowercase branch names, each feat/, fix/, docs/, or chore/ plus a kebab-case slug, drawn from the args (or hint) and the listed changes; a branch name given in the args goes first; with neither, use work/<adjective>-<noun>.\n' ;;
+      branch) printf 'branch: 3 distinct, concise, lowercase branch names, each feat/, fix/, docs/, or chore/ plus a kebab-case slug, drawn from the args (or hint) and the listed changes; a branch name given in the args goes first; with neither, use %s.\n' "$(factory_random_branch)" ;;
       title) printf 'title: one plain, imperative prose line a reviewer can read (e.g. Add a discovery view for albums).\n' ;;
       subject) printf 'subject: %s\n' "$subject" ;;
       subject-from-title) printf 'subject: %s Reshape the pr_title line into it.\n' "$subject" ;;
