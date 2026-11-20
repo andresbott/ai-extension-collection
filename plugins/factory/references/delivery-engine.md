@@ -22,6 +22,29 @@ answers from step 1. Every subagent prompt quotes them verbatim under "The
 user asked:", with your reading of them separately under "My reading:", never
 as settled rulings.
 
+## Working unattended
+
+After step 1 nobody is watching. Any command that needs the user's approval
+stops the whole run until they come back, so the run must never need one.
+Read this section again at the start of every group, and put it in every
+subagent prompt.
+
+- **Never change a checkout.** No `git checkout`, `switch`, `worktree`,
+  `stash`, `reset`, `rebase`, or `cherry-pick`, in any repository or folder:
+  this one, another one on the machine, or a temporary copy you made. The
+  run's only branch change is "Leave main" in step 1, while the user is still
+  here to approve it.
+- **Read other commits instead.** To see another commit, branch, or
+  repository, use read-only commands: `git show <ref>:<path>`,
+  `git log <ref>`, `git diff <a> <b>`, `git -C <repo> log`.
+- **Keep commands plain.** Run them from the repository, one per call. Do not
+  `cd` into folders outside it or chain commands through `$(...)`; that is
+  what triggers approval prompts.
+- **Park what needs the user.** If a step truly needs a command from the list
+  above, or anything else that would ask for approval, do not run it. Record
+  it under "Needs you:" with the command and why it is needed, defer only the
+  part that depends on it, and continue with the rest.
+
 ## What the entry point provides
 
 - **Collect:** the tasks, each with the user's words quoted verbatim.
@@ -67,7 +90,8 @@ finished; they wait with the task.
    branch, it either creates a branch (`success:`) or prints `NEED_NAME` and
    a `--- write` block: write the branch names its rule asks for (no single
    quotes) and run it once more as `new-branch.sh --create '<n1>' '<n2>'
-   '<n3>'`. Uncommitted work moves to the new branch with you. If it ends
+   '<n3>'`. Uncommitted work moves to the new branch with you. This is the
+   run's only branch change, and the user is still here to approve it. If it ends
    with `error:`, add "which branch should I work on?" to the questions
    below, with the error, and do not commit until it is answered.
 2. **Understand each task.** Launch one read-only subagent with all the tasks,
@@ -274,6 +298,14 @@ right away:
   owns the task record). Do not touch the user's data, caches, running
   services, ports, git config, other branches, or commits you did not make.
   No rebase, reset, stash, amend, or force.
+- Nobody is watching: a command that needs approval stops the whole run.
+  Never change a checkout (no `git checkout`, `switch`, `worktree`, `stash`,
+  `reset`, `rebase`, or `cherry-pick`), in this repository, another one, or a
+  temporary copy. To see another commit or repository, use `git show
+  <ref>:<path>`, `git log <ref>`, or `git diff <a> <b>`. Run plain commands
+  from the repository, one per call, without `cd` into other folders or
+  `$(...)`. If you truly need one of these, do not run it: report it as
+  blocked with the command and why.
 - Report in under 300 words, per task: done, blocked, or conflict; the
   commits; the tests you added; the check results with numbers; anything you
   noticed outside your tasks.

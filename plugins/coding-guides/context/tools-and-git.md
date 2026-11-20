@@ -58,8 +58,3 @@ follow the defaults:
   where one "yes" approves the run. When the work is ready, say so and stop;
   the user starts them. Follow one of these commands only when the user typed
   it. Plain git the user asks for (commit, switch branches) is unaffected.
-  The one exception: when the user started the factory's `next-iteration`,
-  `auto-deliver`, or `auto-improve` skill, run its new-branch step as the
-  skill says. That step
-  is how those skills leave `main`/`master`, and it overrides the rules above
-  against creating or switching branches yourself for that run only.
