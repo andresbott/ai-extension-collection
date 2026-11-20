@@ -20,6 +20,29 @@ started it, the scope, and the answers from step 0. Every subagent prompt quotes
 them verbatim under "The user asked:", with your reading of them separately
 under "My reading:", never as settled rulings.
 
+## Working unattended
+
+After step 0 nobody is watching. Any command that needs the user's approval
+stops the whole run until they come back, so the run must never need one.
+Read this section again at the start of every finding, and put it in every
+subagent prompt.
+
+- **Never change a checkout.** No `git checkout`, `switch`, `worktree`,
+  `stash`, `reset`, `rebase`, or `cherry-pick`, in any repository or folder:
+  this one, another one on the machine, or a temporary copy you made. The
+  run's only branch change is "Leave main" in step 0, while the user is still
+  here to approve it.
+- **Read other commits instead.** To see another commit, branch, or
+  repository, use read-only commands: `git show <ref>:<path>`,
+  `git log <ref>`, `git diff <a> <b>`, `git -C <repo> log`.
+- **Keep commands plain.** Run them from the repository, one per call. Do not
+  `cd` into folders outside it or chain commands through `$(...)`; that is
+  what triggers approval prompts.
+- **Park what needs the user.** If a step truly needs a command from the list
+  above, or anything else that would ask for approval, do not run it. Defer
+  the finding with the command and why it is needed, and continue with the
+  next one.
+
 ## 0. Before the user leaves
 
 1. **Leave main.** Run the factory's new-branch script from the repository
@@ -30,7 +53,8 @@ under "My reading:", never as settled rulings.
    (`success:`) or prints `NEED_NAME` and a `--- write` block: write the
    branch names its rule asks for (no single quotes) and run it once more as
    `new-branch.sh --create '<n1>' '<n2>' '<n3>'`. Uncommitted work moves to
-   the new branch with you. If it ends with `error:`, ask the user which
+   the new branch with you. This is the run's only branch change, and the
+   user is still here to approve it. If it ends with `error:`, ask the user which
    branch to work on, with the error, and wait.
 2. Restate the request: the scope and anything else the user asked for, each
    with a "Read as:" line. Name every word or phrase that could mean two
@@ -156,6 +180,14 @@ Commit the TODO.md updates at the end of the round.
   and do not touch the user's data, caches, running services, ports, git
   config, other branches, or commits you did not make. No rebase, reset,
   stash, amend, or force.
+- Nobody is watching: a command that needs approval stops the whole run.
+  Never change a checkout (no `git checkout`, `switch`, `worktree`, `stash`,
+  `reset`, `rebase`, or `cherry-pick`), in this repository, another one, or a
+  temporary copy. To see another commit or repository, use `git show
+  <ref>:<path>`, `git log <ref>`, or `git diff <a> <b>`. Run plain commands
+  from the repository, one per call, without `cd` into other folders or
+  `$(...)`. If you truly need one of these, do not run it: report it as
+  blocked with the command and why.
 - Report in under 300 words: fixed, not reproduced, or blocked; the commits;
   the test you added; the check results with numbers; anything you noticed
   outside the finding.
