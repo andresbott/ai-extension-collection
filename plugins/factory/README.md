@@ -135,7 +135,8 @@ TypeScript, so no model decides how to run it:
   prompt, so there's no exploratory tool call.
 - **Zero-tool paths.** Already on a feature branch, given a valid explicit
   name, or given nothing on a clean tree (it picks a random, unused
-  `work/<adjective>-<noun>`): the script finishes during preprocessing and
+  `work/<adjective>-<noun>`; changes to todo files such as `TODO.md` or
+  `.todo.json` count as clean): the script finishes during preprocessing and
   prints a result line (`success: ...` or `error: ...`) followed by one `DONE`
   line.
 - **One tool call otherwise.** The script prints `NEED_NAME` and at most 25
