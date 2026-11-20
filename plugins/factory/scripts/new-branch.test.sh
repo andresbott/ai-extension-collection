@@ -54,6 +54,26 @@ done
 pass "repeated runs pick distinct names that skip existing branches"
 
 new_repo
+printf 'todo\n' > "$repo/TODO.md"
+printf '{}\n' > "$repo/.todo.json"
+mkdir -p "$repo/docs"
+printf 'todo\n' > "$repo/docs/todo.md"
+git -C "$repo" add TODO.md
+out="$(run '')"
+[[ "$(tail -n 1 <<<"$out")" =~ ^DONE\ state=created\ branch=work/[a-z]+-[a-z]+\ from=main$ ]] || fail "todo only: $out"
+pass "changes only to todo files still get a random work/ branch"
+
+new_repo
+printf 'todo\n' > "$repo/TODO.md"
+printf 'x\n' > "$repo/new.txt"
+out="$(run '')"
+[[ "$(head -n 1 <<<"$out")" == "NEED_NAME on=main" ]] || fail "todo plus change: $out"
+grep -q 'new.txt' <<<"$out" || fail "real change missing: $out"
+grep -q 'TODO.md' <<<"$out" && fail "todo file shown to the model: $out"
+[[ "$(on)" == main ]] || fail "preflight must not switch"
+pass "todo files are left out of the status the model names from"
+
+new_repo
 printf 'x\n' > "$repo/new.txt"
 out="$(run '')"
 [[ "$(head -n 1 <<<"$out")" == "NEED_NAME on=main" ]] || fail "need name: $out"

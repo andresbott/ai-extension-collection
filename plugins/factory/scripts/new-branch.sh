@@ -15,6 +15,8 @@
 #
 # With no args and a clean tree there is nothing to name the branch after, so
 # the preflight creates a random free work/<adjective>-<noun> branch itself.
+# Changes to todo-list files (TODO.md, .todo.json, ...) don't count: they are
+# ignored both for that check and in the status the model names from.
 # When every candidate is taken, -2..-9 suffixes on the first valid one are
 # tried, so the model never needs a second round.
 set -uo pipefail
@@ -77,8 +79,23 @@ if [[ -n "$arg" ]] && valid "$arg"; then
   exit 0
 fi
 
-# Nothing to name it after (no args, clean tree): a random free work/ name.
-status="$(git status --short --untracked-files=all)"
+# Status lines minus the todo list (TODO.md, .todo.json, its lock, ...): it is
+# edited all the time and says nothing about what the branch is for.
+not_todo() {
+  local line path
+  while IFS= read -r line; do
+    path="${line:3}"
+    path="${path##* -> }"
+    path="${path%\"}"
+    path="${path#\"}"
+    path="${path##*/}"
+    [[ "$path" =~ ^\.?[Tt][Oo][Dd][Oo](\..*)?$ ]] || printf '%s\n' "$line"
+  done
+}
+
+# Nothing to name it after (no args, no changes beyond the todo list): a
+# random free work/ name.
+status="$(git status --short --untracked-files=all | not_todo)"
 if [[ -z "$arg" && -z "$status" ]]; then
   create "$(factory_random_branch)"
   exit 0
