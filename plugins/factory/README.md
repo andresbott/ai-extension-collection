@@ -133,9 +133,11 @@ TypeScript, so no model decides how to run it:
 
 - **`!` preprocessing** runs `scripts/new-branch.sh` before the model sees the
   prompt, so there's no exploratory tool call.
-- **Zero-tool paths.** Already on a feature branch, or given a valid explicit
-  name: the script finishes during preprocessing and prints a result line
-  (`success: ...` or `error: ...`) followed by one `DONE` line.
+- **Zero-tool paths.** Already on a feature branch, given a valid explicit
+  name, or given nothing on a clean tree (it picks a random, unused
+  `work/<adjective>-<noun>`): the script finishes during preprocessing and
+  prints a result line (`success: ...` or `error: ...`) followed by one `DONE`
+  line.
 - **One tool call otherwise.** The script prints `NEED_NAME` and at most 25
   lines of `git status --short`. The model proposes 3 names and calls `--create`
   once.

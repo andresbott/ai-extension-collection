@@ -126,6 +126,7 @@ test("the review commands resolve the review engine, and review-branch the deliv
 
 test("/factory:new-branch names the branch with the model and creates it", async () => {
   const { repo } = fixture(false);
+  writeFileSync(join(repo, "new.txt"), "x\n"); // a change to name the branch after
   const pi = load(repo, "=== branch\nfeat/pi-e2e\nfeat/other\nfeat/third");
   await pi.run("factory:new-branch");
   assert.equal(git(repo, "branch", "--show-current"), "feat/pi-e2e");
@@ -137,6 +138,7 @@ test("/factory:new-branch names the branch with the model and creates it", async
 
 test("texts are written by a cheap available model, not the session's model", async () => {
   const { repo } = fixture(false);
+  writeFileSync(join(repo, "new.txt"), "x\n"); // a change to name the branch after
   const available = [
     { provider: "fake", id: "model" },
     { provider: "fake", id: "claude-haiku-4.5" },
@@ -180,6 +182,7 @@ test("a complex change runs the expert on the session's model; simple texts stay
 
 test("FACTORY_CHEAP_MODEL overrides the cheap pick", async () => {
   const { repo } = fixture(false);
+  writeFileSync(join(repo, "new.txt"), "x\n"); // a change to name the branch after
   const available = [
     { provider: "fake", id: "claude-haiku-4.5" },
     { provider: "fake", id: "big" },
