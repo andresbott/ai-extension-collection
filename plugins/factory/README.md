@@ -141,7 +141,10 @@ TypeScript, so no model decides how to run it:
   line.
 - **One tool call otherwise.** The script prints `NEED_NAME` and at most 25
   lines of `git status --short`. The model proposes 3 names and calls `--create`
-  once.
+  once. If the args ask for a random name (`/factory:new-branch use a random
+  name`), the model calls `--random` instead and the changes are ignored; in pi,
+  where the model only writes names, the naming rule has it return the random
+  name the script supplies.
 - **No retry rounds.** If every candidate is taken, the script tries `-2`…`-9`
   suffixes on the first valid one.
 

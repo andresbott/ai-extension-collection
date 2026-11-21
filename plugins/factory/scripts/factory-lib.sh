@@ -202,7 +202,7 @@ factory_write_rules() {
   printf -- '--- write\n'
   for key in "$@"; do
     case "$key" in
-      branch) printf 'branch: 3 distinct, concise, lowercase branch names, each feat/, fix/, docs/, or chore/ plus a kebab-case slug, drawn from the args (or hint) and the listed changes; a branch name given in the args goes first; with neither, use %s.\n' "$(factory_random_branch)" ;;
+      branch) printf 'branch: 3 distinct, concise, lowercase branch names, each feat/, fix/, docs/, or chore/ plus a kebab-case slug, drawn from the args (or hint) and the listed changes; a branch name given in the args goes first; if the args or hint ask for a random name, or there is neither, use only %s.\n' "$(factory_random_branch)" ;;
       title) printf 'title: one plain, imperative prose line a reviewer can read (e.g. Add a discovery view for albums).\n' ;;
       subject) printf 'subject: %s\n' "$subject" ;;
       subject-from-title) printf 'subject: %s Reshape the pr_title line into it.\n' "$subject" ;;

@@ -9,6 +9,11 @@ allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/scripts/new-branch.sh:*)
 If the output above starts with `success:` or `error:`, reply with the output
 verbatim (its result line, then its `DONE` line). Call no tools.
 
+If the args (the `hint`) ask for a random name, in any wording, ignore the
+listed changes and run exactly once, then reply as below:
+
+`${CLAUDE_PLUGIN_ROOT}/scripts/new-branch.sh --random`
+
 Otherwise write the branch names its `--- write` block asks for, following its
 rule and never using single quotes. Run exactly once:
 
