@@ -151,12 +151,22 @@ independent subagent before it can reach the user:
   preferred option: a qualifier handed an answer tends to confirm it.
 - **What it does.** It reads the code, the docs, and the project's
   conventions, and picks the option with the best long-term maintainability.
-- **What counts as the user's.** It may not decide, and returns the question
-  as the user's, when it is about product behaviour or what the user wants, a
-  trade-off with no clear winner, a breaking change, or a critical risk (data
-  loss, a migration of stored data, security, a change to how the system is
-  deployed or run). It also returns it when the code and the user's words do
-  not give it enough to choose.
+- **Small choices are always decided.** A small choice is one where any
+  sensible option works, and switching later is a small edit that touches no
+  stored data, public interface, or deployment: a timing, delay, threshold,
+  size, limit, or spacing value; the wording of a label or message; a default
+  sort order; an icon or colour within the existing style. It decides these
+  even when they shape product behaviour and no option clearly wins: it picks
+  the value the project already uses for similar cases, otherwise the common
+  convention (for example a 300 ms long-press delay, as in the usual platform
+  defaults), and gives the reason in one line. The user corrects it later if
+  it feels wrong; asking costs them more than the fix.
+- **What counts as the user's.** Apart from small choices, it may not decide,
+  and returns the question as the user's, when it is about product behaviour
+  or what the user wants, a trade-off with no clear winner, a breaking change,
+  or a critical risk (data loss, a migration of stored data, security, a
+  change to how the system is deployed or run). It also returns it when the
+  code and the user's words do not give it enough to choose.
 - **Its report,** per question: decided, with the answer and a one-line
   reason; or the user's, with the options and why it could not decide.
 
@@ -199,8 +209,9 @@ one's result on the same branch, with no worktrees or merges. For each group:
 7. **Review.** Green: review the finished tasks one at a time, as in
    "Reviewing a task" below. Set a task to `review` only when its own
    reviewer starts.
-8. **Close.** Record the commit hashes on each task and set it to `done` or
-   `followup`, then save the record. A task that ends `followup` goes
+8. **Close.** Record the commit hashes on each task, and the small choices
+   the implementer settled under "Decided:" with their reason, and set it to
+   `done` or `followup`, then save the record. A task that ends `followup` goes
    straight to "Follow-ups".
 
 ### Reviewing a task
@@ -286,8 +297,13 @@ right away:
 - If the code, the task, or the user's words as quoted contradict "My
   reading:", report the conflict instead of working around it. Stop and
   report if the task needs a breaking change that is not allowed.
-- If you hit an open question your brief does not settle, do not pick an
-  answer yourself: finish what does not depend on it, then report the
+- If you hit a small choice (see "Qualifying a question": a value, a label,
+  a minor detail that any sensible option serves and that is a small edit to
+  change later), settle it yourself with the value the project already uses
+  for similar cases, otherwise the common convention, and list it in your
+  report with a one-line reason.
+- If you hit any other open question your brief does not settle, do not pick
+  an answer yourself: finish what does not depend on it, then report the
   question with the options you see. The orchestrator has it qualified and
   sends a fresh implementer with the result.
 - Follow the repository's own rules (AGENTS.md, CLAUDE.md), such as version

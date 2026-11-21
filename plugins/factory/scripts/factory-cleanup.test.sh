@@ -52,3 +52,17 @@ output="$( (cd "$primary" && "$CLEANUP_SCRIPT" 'branch=feat/work') 2>&1)" || fai
 [[ "$output" == *'state=partial'* && "$output" == *'worktree=deferred-dirty'* ]] || fail "dirty worktree was not deferred: $output"
 [[ -f "$feature/dirty.txt" ]] || fail "dirty worktree content was removed"
 printf 'PASS: dirty feature worktree is preserved\n'
+
+new_fixture
+git -C "$primary" branch feat/old; git -C "$primary" push -qu origin feat/old; git -C "$primary" push -q origin --delete feat/old
+git -C "$primary" branch feat/live; git -C "$primary" push -qu origin feat/live
+git -C "$primary" branch feat/unpushed
+output="$( (cd "$primary" && "$CLEANUP_SCRIPT" 'branch=feat/work' 'deleteRemote=true') 2>&1)" || fail "prune cleanup failed: $output"
+[[ "$output" == *'state=clean'* && "$output" == *'local_branch=deleted'* ]] || fail "shipped branch was not pruned: $output"
+[[ "$output" == *'pruned=feat/old,feat/work'* ]] || fail "pruned list wrong: $output"
+! git -C "$primary" show-ref --verify --quiet refs/heads/feat/work || fail "gone shipped branch was kept"
+! git -C "$primary" show-ref --verify --quiet refs/heads/feat/old || fail "stale gone branch was kept"
+git -C "$primary" show-ref --verify --quiet refs/heads/feat/live || fail "branch with a live upstream was deleted"
+git -C "$primary" show-ref --verify --quiet refs/heads/feat/unpushed || fail "branch without upstream was deleted"
+git -C "$primary" show-ref --verify --quiet refs/heads/main || fail "main was deleted"
+printf 'PASS: branches whose upstream is gone are pruned; live, unpushed, and main are kept\n'

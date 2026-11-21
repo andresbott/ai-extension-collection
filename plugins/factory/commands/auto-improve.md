@@ -215,6 +215,12 @@ severe first. For each:
    - a critical risk: data loss, a migration of stored data, security, or a
      change to how the system is deployed or run
 
+   A small choice is never a gate, even when it shapes product behaviour: a
+   timing, threshold, size, or limit value, the wording of a label or
+   message, or a similar detail that any sensible option serves and that is a
+   small edit to change later. Pick the value the project already uses for
+   similar cases, otherwise the common convention.
+
    Any other question has a reasonable default: settle it yourself, or ask a
    specialist reviewer subagent, and pick the option with the best long-term
    maintainability. Write each such decision in the plan.

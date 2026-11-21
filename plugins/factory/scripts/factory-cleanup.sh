@@ -60,10 +60,29 @@ if [[ -n "$worktree_path" ]]; then
   fi
 fi
 
+# Prune local branches whose upstream is gone (merged and deleted on the
+# remote), like `git fetch -p` plus `git branch -D` on each `: gone]` branch.
+# A branch still checked out in some worktree cannot be deleted; it is skipped.
+local_state=kept
+pruned=()
+git fetch "$remote" --prune >/dev/null 2>&1 || partial=true
+while IFS=' ' read -r name track; do
+  [[ "$track" == '[gone]' ]] || continue
+  factory_is_protected_branch "$name" "$remote" && continue
+  if git branch -D "$name" >&2; then
+    pruned+=("$name")
+    [[ "$name" == "$branch" ]] && local_state=deleted
+  fi
+done < <(git for-each-ref --format='%(refname:short) %(upstream:track)' refs/heads)
+pruned_list=none
+if ((${#pruned[@]})); then
+  pruned_list="$(IFS=,; printf '%s' "${pruned[*]}")"
+fi
+
 state=clean
-report='cleanup completed; local branch kept'
+report="cleanup completed; local branch $local_state"
 if [[ "$partial" == true ]]; then
   state=partial
-  report='cleanup partially completed; local branch kept'
+  report="cleanup partially completed; local branch $local_state"
 fi
-printf 'state=%s\nremote_branch=%s\nworktree=%s\nlocal_branch=kept\nreport=%s\n' "$state" "$remote_state" "$worktree_state" "$report"
+printf 'state=%s\nremote_branch=%s\nworktree=%s\nlocal_branch=%s\npruned=%s\nreport=%s\n' "$state" "$remote_state" "$worktree_state" "$local_state" "$pruned_list" "$report"
