@@ -462,7 +462,7 @@ run() {
   worktree="$(kv worktree)"; main="$(kv branch)"
 
   step cleanup "$D/factory-cleanup.sh" "branch=$branch" remote=origin "deleteRemote=$delete_remote"
-  summary="pr=#$number url=$url sync=synced cleanup=$st remote_branch=$(kv remote_branch) worktree=$(kv worktree)"
+  summary="pr=#$number url=$url sync=synced cleanup=$st remote_branch=$(kv remote_branch) worktree=$(kv worktree) local_branch=$(kv local_branch) pruned=$(kv pruned)"
   local final='SHIPPED' tagged='' issues=() landed issue_text
   [[ "$st" == clean ]] || { final='PARTIAL'; issues+=("cleanup is incomplete: $(why)"); }
 

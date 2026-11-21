@@ -366,8 +366,12 @@ test. Every guard applies:
   anything is committed.
 - The merge needs a valid Conventional Commit subject, a matching PR head, and
   checks that are green or explicitly absent.
-- Sync fast-forwards only and refuses a dirty primary worktree. Cleanup keeps
-  the local branch and deletes the remote branch only with `deleteRemote=true`.
+- Sync fast-forwards only and refuses a dirty primary worktree. Cleanup
+  deletes the remote branch only with `deleteRemote=true`, then, back on the
+  default branch, prunes every local branch whose upstream is gone (`git fetch
+  -p`, then `git branch -D` on each `[gone]` branch, never a protected one or
+  one checked out in a worktree). A local branch whose remote still exists is
+  kept.
   Tagging happens only with an explicit `tag=<semver>` or an explicit answer to
   the tag question.
 - **Merged-PR guard:** new work on a branch whose PR is already merged is never
