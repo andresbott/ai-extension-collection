@@ -78,7 +78,7 @@ printf 'x\n' > "$repo/new.txt"
 out="$(run '')"
 [[ "$(head -n 1 <<<"$out")" == "NEED_NAME on=main" ]] || fail "need name: $out"
 grep -q -- '^--- write$' <<<"$out" || fail "write block missing: $out"
-grep -q '^branch: 3 distinct.*use work/[a-z]*-[a-z]*\.$' <<<"$out" || fail "branch rule missing: $out"
+grep -q '^branch: 3 distinct.*use only work/[a-z]*-[a-z]*\.$' <<<"$out" || fail "branch rule missing: $out"
 out="$(run 'add a login page')"
 grep -q '^NEED_NAME on=main hint=' <<<"$out" || fail "hint: $out"
 grep -q 'new.txt' <<<"$out" || fail "status missing: $out"
@@ -90,6 +90,13 @@ git -C "$repo" update-ref refs/remotes/origin/feat/remote HEAD
 out="$(run --create 'bad..name' feat/taken feat/remote feat/free)"
 [[ "$(tail -n 1 <<<"$out")" == "DONE state=created branch=feat/free from=main" ]] || fail "skip: $out"
 pass "invalid and taken candidates are skipped in order"
+
+new_repo
+printf 'x\n' > "$repo/new.txt"
+out="$(run --random)"
+[[ "$(tail -n 1 <<<"$out")" =~ ^DONE\ state=created\ branch=work/[a-z]+-[a-z]+\ from=main$ ]] || fail "--random: $out"
+[[ "$(on)" == work/* ]] || fail "--random not checked out"
+pass "--random creates a random work/ branch even with changes"
 
 new_repo
 git -C "$repo" branch feat/a

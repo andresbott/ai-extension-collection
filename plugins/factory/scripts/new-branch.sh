@@ -4,6 +4,8 @@
 #
 #   new-branch.sh [name]            preflight (run by the command's ! line)
 #   new-branch.sh --create n1 [n2]  create the first free candidate
+#   new-branch.sh --random          create a random free work/ branch (run by
+#                                   the model when the args ask for one)
 #
 # Lines:
 #   DONE state=unchanged branch=<b>              already on a feature branch
@@ -69,6 +71,10 @@ if [[ "${1:-}" == --create ]]; then
   shift
   [[ $# -gt 0 ]] || fail "no branch name candidates supplied"
   create "$@"
+  exit 0
+fi
+if [[ "${1:-}" == --random ]]; then
+  create "$(factory_random_branch)"
   exit 0
 fi
 
