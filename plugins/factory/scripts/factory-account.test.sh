@@ -115,9 +115,26 @@ out="$(account)"
   fail "nobody report: $out"
 touch "$FAKE_GH/apidown"
 out="$(account)"
-[[ "$(field state)" == failed && "$(field report)" == 'could not check every gh account: a: error connecting to api.github.com; b: error connecting to api.github.com' ]] ||
+[[ "$(field state)" == failed && "$(field report)" == 'no gh account on github.com (a,b) is known to push to o/r; could not check a: error connecting to api.github.com; b: error connecting to api.github.com' ]] ||
   fail "gh error: $out"
 pass "no account that can push, or a gh error, fails with the reason"
+
+ip_block='the `o` organization has an IP allow list enabled, and your IP address is not permitted to access this resource. (HTTP 403)'
+fixture git@github.com:o/r.git 'a b' ''
+printf 'a' > "$FAKE_GH/forbid"
+out="$(FAKE_SSH_LOGIN=a account)"
+[[ "$(field state)" == failed ]] || fail "refused check: $out"
+[[ "$(field report)" == "no gh account on github.com (a,b) is known to push to o/r; could not check a: gh: Although you appear to have the correct authorization credentials, $ip_block" ]] ||
+  fail "refused report: $out"
+printf 'b' > "$FAKE_GH/push"
+out="$(account)"
+expect resolved b access
+[[ "$(field report)" == *"not checked: a: "*"IP allow list"* ]] || fail "refused account not mentioned: $out"
+printf 'b' > "$FAKE_GH/forbid"
+out="$(account)"
+[[ "$(field state)" == failed && "$(field report)" == "could not check b: gh: Although you appear to have the correct authorization credentials, $ip_block" ]] ||
+  fail "refused saved account: $out"
+pass "a 403 such as an IP allow list is reported with GitHub's reason, not as no push access"
 
 fixture git@github.com:o/r.git '' ''
 out="$(account)"
