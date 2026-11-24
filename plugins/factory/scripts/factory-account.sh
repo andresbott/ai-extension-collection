@@ -64,18 +64,20 @@ fi
 command -v jq >/dev/null 2>&1 || failed 'jq is not installed; factory needs it for .git/factory.json'
 file="$(factory_account_file)" || failed 'the git directory could not be found'
 
-# 0: <login> can push to the repo; 1: it cannot (no access, read-only, or an
-# HTTP error such as unauthorized SSO); 2: gh failed, message in $probe_error.
+# 0: <login> can push to the repo; 1: it cannot (read-only, or a 404: GitHub
+# hides repos a login has no access to); 2: the check itself was refused or
+# failed (an IP allow list, unauthorized SSO, an expired token, a rate limit, a
+# network error), with GitHub's message in $probe_error.
 probe_error=''
 can_push() {
-  local token res
+  local token
   token="$(gh auth token --hostname "$host" --user "$1" 2>/dev/null)" || { probe_error="$1: gh has no token"; return 2; }
   factory_gh_capture env "$var=$token" gh api --hostname "$host" "repos/$repo" --jq '.permissions.push'
   if [[ $gh_status -eq 0 ]]; then
     [[ "$gh_out" == true ]]
     return
   fi
-  grep -qE 'HTTP 4[0-9][0-9]' <<< "$gh_err" && return 1
+  grep -q 'HTTP 404' <<< "$gh_err" && return 1
   probe_error="$1: $(factory_gh_error "$gh_err")"
   return 2
 }
@@ -176,9 +178,12 @@ while IFS= read -r login; do
   esac
 done <<< "$logins"
 
-[[ -z "$errors" ]] || failed "could not check every gh account: $errors" "$listed"
+# A failed check stops the run only when it leaves no account that can push:
+# an account GitHub would not check could not push now anyway.
 case "$pushers" in
-  '') failed "none of the gh accounts on $host ($listed) can push to $repo; log in with one that can: gh auth login --hostname $host" "$listed" ;;
-  *,*) result ask '' '' "$pushers" "several gh accounts can push to $repo; choose one"; exit 0 ;;
-  *) found "$pushers" access "$pushers is the only gh account that can push to $repo" ;;
+  '')
+    [[ -z "$errors" ]] || failed "no gh account on $host ($listed) is known to push to $repo; could not check $errors" "$listed"
+    failed "none of the gh accounts on $host ($listed) can push to $repo; log in with one that can: gh auth login --hostname $host" "$listed" ;;
+  *,*) result ask '' '' "$pushers" "several gh accounts can push to $repo; choose one${errors:+ (not checked: $errors)}"; exit 0 ;;
+  *) found "$pushers" access "$pushers is the only gh account that can push to $repo${errors:+ (not checked: $errors)}" ;;
 esac

@@ -206,7 +206,10 @@ With several logins that can push, `prepare` prints `NEED_ACCOUNT` and the
 command asks you once (AskUserQuestion in Claude Code, a selector in pi). Your
 pick is checked and saved with `ship.sh account <login>`, and `prepare` runs
 again. With no login that can push, `prepare` stops and lists the accounts it
-tried. A `gh` too old to list its accounts (`gh auth status --json`), or an
+tried. Only a read-only answer or a 404 counts as "cannot push". When GitHub
+refuses the check itself (an org IP allow list, a token not authorized for SAML
+SSO, an expired token, a rate limit), the stop shows GitHub's reason for that
+account instead. A `gh` too old to list its accounts (`gh auth status --json`), or an
 origin without a GitHub host, keeps `gh`'s active account, as before.
 
 The choice lives in `.git/factory.json`, in the clone's common git directory,

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Fake gh for the ship and pi tests; its state lives in $FAKE_GH. Accounts:
 # `logins` (space-separated, default "tester") are logged in, `push` lists those
-# that can push to the repo, `read` those that can only read it; any other login
-# gets a 404. Each call is logged with its token to `tokens`.
+# that can push to the repo, `read` those that can only read it, `forbid` those
+# GitHub refuses with a 403 (an IP allow list); any other login gets a 404. Each call is logged with its token to `tokens`.
 s="$FAKE_GH"; printf '%s\n' "$*" >> "$s/log"
 printf '%s\t%s\n' "${GH_TOKEN:-${GH_ENTERPRISE_TOKEN:-}}" "$*" >> "$s/tokens"
 # hint: gh 2.105+ prints a multi-line hint on stderr and still exits 0.
@@ -29,7 +29,10 @@ case "${1:-} ${2:-}" in
   'api '*)
     [[ ! -f "$s/apidown" ]] || { printf 'error connecting to api.github.com\n' >&2; exit 1; }
     login="${GH_TOKEN:-${GH_ENTERPRISE_TOKEN:-}}"; login="${login#tok-}"
-    if has push "$login"; then printf '{"permissions":{"push":true}}\n' | jq -r "${jq:-.}"
+    if has forbid "$login"; then
+      printf '{"message":"IP allow list","status":"403"}'
+      printf 'gh: Although you appear to have the correct authorization credentials, the `o` organization has an IP allow list enabled, and your IP address is not permitted to access this resource. (HTTP 403)\n' >&2; exit 1
+    elif has push "$login"; then printf '{"permissions":{"push":true}}\n' | jq -r "${jq:-.}"
     elif has read "$login"; then printf '{"permissions":{"push":false}}\n' | jq -r "${jq:-.}"
     else printf '{"message":"Not Found","status":"404"}'; printf 'gh: Not Found (HTTP 404)\n' >&2; exit 1
     fi ;;
