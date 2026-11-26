@@ -53,7 +53,7 @@ genuinely hard to write.
 | Command | Arguments | Behaviour |
 |---|---|---|
 | `/factory:new-branch` | `[branch name]` | On `main`/`master`/the default branch, creates and checks out a feature branch; otherwise leaves the current branch unchanged. |
-| `/factory:open-pr` | `[branch name] [target <base branch>]` | branch → verify → commit → push → open (or reuse) PR → wait for CI; stops at green (`READY`). Never merges. The PR targets the default branch unless `target` names another branch on `origin`. |
+| `/factory:open-pr` | `[branch name] [target <base branch>]` | branch → verify → commit → push → open (or reuse) PR → wait for CI; stops at green (`READY`). Never merges. The PR targets the default branch unless `target <branch>` names another branch on `origin` (`against`, `into`, `base`, and `target=<branch>` work too). On a feature branch, any other argument is an error rather than silently ignored. |
 | `/factory:ship` | `[branch name] [tag=<semver> \| no tag] [deleteRemote=true]` | The same flow, then squash-merge → sync main → cleanup → offer a release tag (never tags by default). |
 
 `open-pr` then `ship` is the review-first path: `open-pr` gets the PR green, and
@@ -350,7 +350,7 @@ ship: [n] <stage> ... / -> <state>                      # progress, one pair per
 --- failure: verify|wait-ci ...                         # only on those failures
 success: ... / warning: ... / error: ...                # result line, right before each outcome line
 SHIPPED pr=#N url=... sync=synced cleanup=clean ... tag=ask|declined|none|tagged ... log=<file>
-READY pr=#N url=... ci=green|none log=<file>            # open-pr: PR open, CI green, not merged
+READY pr=#N url=... base=<branch> ci=green|none log=<file>  # open-pr: PR open, CI green, not merged
 TAGGED version=<v> latest=<v> log=<file>                # after an explicitly chosen tag
 PARTIAL ...                                             # merged, but sync/cleanup/tag incomplete
 WAITING stage=wait-ci pr=#N url=... log=<file>          # CI still running; re-run to resume

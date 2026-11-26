@@ -106,21 +106,28 @@ prepare() {
   local for=ship
   if [[ "${1:-}" == --for ]]; then for="${2:-ship}"; shift 2; fi
   local hint="${1:-}" target='' current base ref mb protected=no pr=none pr_title='' dirty ahead files lines dirs need writer=cheap
-  # `target <branch>` in the args picks the PR's base; the rest stays a branch-name hint.
-  if [[ "$hint" =~ (^|[[:space:]])target[[:space:]]+([^[:space:]]+) ]]; then
-    target="${BASH_REMATCH[2]}"
+  # `target <branch>` in the args (or against/into/base, with a space or `=`)
+  # picks the PR's base; the rest stays a branch-name hint.
+  local word='(target|against|into|base)'
+  if [[ "$hint" =~ (^|[[:space:]])$word([[:space:]]+|=)([^[:space:]=]+) ]]; then
+    target="${BASH_REMATCH[4]}"
     hint="${hint/"${BASH_REMATCH[0]}"/}"
     hint="$(sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' <<< "$hint")"
-    [[ "$for" == pr ]] || fail "target works only with /factory:open-pr; /factory:ship always merges into the default branch"
+    [[ "$for" == pr ]] || fail "${BASH_REMATCH[2]} works only with /factory:open-pr; /factory:ship always merges into the default branch"
     git check-ref-format --branch "$target" >/dev/null 2>&1 || fail "target $target is not a valid branch name"
-  elif [[ "$hint" =~ (^|[[:space:]])target[[:space:]]*$ ]]; then
-    fail "target needs a branch name, as in: target main"
+  elif [[ "$hint" =~ (^|[[:space:]])$word(=|[[:space:]]*$) ]]; then
+    fail "${BASH_REMATCH[2]} needs a branch name, as in: target main"
   fi
   current="$(git branch --show-current)"
   [[ -n "$current" ]] || fail "detached HEAD"
   [[ "$target" != "$current" ]] || fail "target $target is the current branch; a pull request needs a different base"
   git remote get-url origin >/dev/null 2>&1 || fail "no origin remote"
   factory_remote_default_unresolved origin && fail "default branch could not be resolved safely"
+  # Args are only a branch-name hint when a branch gets created; on a feature
+  # branch, anything left would be silently ignored, so stop instead.
+  if [[ "$for" == pr && -n "$hint" ]] && ! factory_is_protected_branch "$current" origin; then
+    fail "unused arguments: $hint; already on $current, so only target <branch> is understood"
+  fi
   factory_gh_authenticated origin || fail "GitHub CLI is unavailable or unauthenticated"
   # First, so a question about the account comes before any slow work.
   resolve_account
@@ -479,8 +486,12 @@ run() {
       if [[ "$until" == pr ]]; then
         ci='CI is green'
         [[ "$st" == green ]] || ci='no CI checks are configured'
-        result success "PR #$number is ready: $ci; run /factory:ship to merge"
-        printf 'READY pr=#%s url=%s ci=%s log=%s\n' "$number" "$url" "$st" "$log"
+        # The base GitHub has, so a wrong target shows up here rather than at merge.
+        local into
+        into="$(gh pr view "$number" --json baseRefName --jq .baseRefName 2>/dev/null)"
+        into="${into:-unknown}"
+        result success "PR #$number into $into is ready: $ci; run /factory:ship to merge"
+        printf 'READY pr=#%s url=%s base=%s ci=%s log=%s\n' "$number" "$url" "$into" "$st" "$log"
         exit 0
       fi
       step merge "$D/factory-merge.sh" "pr=$number" "subject=$subject"
