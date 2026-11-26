@@ -19,6 +19,13 @@ if [[ ! "$pr" =~ ^[0-9]+$ ]]; then
   exit 0
 fi
 
+# GitHub runs no pull_request checks on a conflicting PR, so the wait below
+# would end in "no CI checks are configured" instead of the real reason.
+if base="$(factory_pr_conflicts "$pr")"; then
+  printf 'state=conflict\nnumber=%s\nreport=%s\n' "$pr" "$(factory_conflict_report "$pr" "$base")"
+  exit 0
+fi
+
 no_checks() { printf '%s' "$1" | grep -qiE 'no checks|no check runs'; }
 
 # A new PR has no checks until GitHub registers its first run (a pull_request

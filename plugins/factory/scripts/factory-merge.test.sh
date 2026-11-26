@@ -21,6 +21,8 @@ printf '%s\n' "$*" >> "$GH_LOG"
 [[ -z "${GH_HINT:-}" ]] || printf '%s\n' 'hint: if you need to wait for this pull request to be reviewed, merged, or closed before continuing, use this instead of' 'polling:' '  gh event listen' >&2
 case "${1:-} ${2:-}" in
   'pr view')
+    if [[ "$*" == *mergeable* ]]; then printf '%s\tmain\n' "${GH_MERGEABLE:-MERGEABLE}"; exit 0; fi
+    if [[ "$*" == *baseRefName* ]]; then printf 'main\n'; exit 0; fi
     case "${GH_SCENARIO:-open}" in
       open) printf '42	OPEN	feat/merge\n' ;;
       merged) printf '42	MERGED	feat/merge\n' ;;
@@ -41,6 +43,8 @@ case "${1:-} ${2:-}" in
     esac
     ;;
   'pr merge')
+    # GH_MERGE_ERROR: gh refuses the merge with this message.
+    [[ -z "${GH_MERGE_ERROR:-}" ]] || { printf '%s\n' "$GH_MERGE_ERROR" >&2; exit 1; }
     [[ "$*" == "pr merge 42 --squash --subject feat: add feature (#42) --body " ]] || {
       printf 'merge args mismatch: %s\n' "$*" >&2; exit 9;
     }
@@ -127,3 +131,23 @@ output="$( (cd "$repo" && PATH="$bin:$PATH" GH_LOG="$log" GH_HINT=1 GH_SCENARIO=
 set -e
 [[ "$output" == *'report=pull request lookup failed: HTTP 502: Bad Gateway'* ]] || fail "a gh hint hid the lookup error: $output"
 printf 'PASS: a gh hint on stderr is not read as the PR lookup\n'
+
+new_fixture feat/merge
+output="$( (cd "$repo" && PATH="$bin:$PATH" GH_LOG="$log" GH_MERGEABLE=CONFLICTING "$MERGE_SCRIPT" 'pr=42' 'subject=feat: add feature') 2>&1)" || fail "a conflicting PR should return safely: $output"
+[[ "$output" == *'state=conflict'* && "$output" == *'report=pull request #42 has merge conflicts with main; '* ]] || fail "conflict not reported: $output"
+! grep -q '^pr merge ' "$log" || fail "a conflicting PR attempted merge"
+printf 'PASS: a conflicting PR is reported before merging\n'
+
+new_fixture feat/merge
+output="$( (cd "$repo" && PATH="$bin:$PATH" GH_LOG="$log" GH_MERGE_ERROR='X Pull request o/r#42 is not mergeable: the merge commit cannot be cleanly created.' "$MERGE_SCRIPT" 'pr=42' 'subject=feat: add feature') 2>&1)" || fail "a merge refused for a conflict should return safely: $output"
+[[ "$output" == *'state=conflict'* && "$output" == *'conflicts with main'* ]] || fail "a refused merge was not reported as a conflict: $output"
+printf 'PASS: a merge gh refuses for a conflict is reported as a conflict\n'
+
+new_fixture feat/merge
+set +e
+output="$( (cd "$repo" && PATH="$bin:$PATH" GH_LOG="$log" GH_MERGE_ERROR='GraphQL: Base branch was modified. (mergePullRequest)' "$MERGE_SCRIPT" 'pr=42' 'subject=feat: add feature') 2>&1)"
+status=$?
+set -e
+[[ $status -ne 0 && "$output" == *'state=failed'* && "$output" == *'report=merge failed: GraphQL: Base branch was modified. (mergePullRequest)'* ]] ||
+  fail "a refused merge hid the gh error: status=$status output=$output"
+printf 'PASS: a merge gh refuses reports the gh error\n'

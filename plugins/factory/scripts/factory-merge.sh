@@ -56,6 +56,10 @@ if [[ "$head" != "$branch" ]]; then
   printf 'state=blocked\nnumber=%s\nbranch=%s\nsubject=\nreport=pull request head does not match current branch\n' "$number" "$branch"
   exit 0
 fi
+if base="$(factory_pr_conflicts "$number")"; then
+  printf 'state=conflict\nnumber=%s\nbranch=%s\nsubject=\nreport=%s\n' "$number" "$branch" "$(factory_conflict_report "$number" "$base")"
+  exit 0
+fi
 
 if [[ -z "$subject" || "$subject" == *$'\n'* || "$subject" == *$'\r'* || ! "$subject" =~ ^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-zA-Z0-9._/-]+\))?(!)?:[[:space:]]+[^[:space:]].*$ ]]; then
   printf 'state=failed\nnumber=%s\nbranch=%s\nsubject=\nreport=a valid one-line Conventional Commit subject is required\n' "$number" "$branch"
@@ -83,5 +87,18 @@ if [[ -z "$branch" || "$branch" != "$head" ]] || factory_remote_default_unresolv
   exit 0
 fi
 
-gh pr merge "$pr" --squash --subject "$subject (#$pr)" --body "" >&2
+factory_gh_capture gh pr merge "$pr" --squash --subject "$subject (#$pr)" --body ""
+[[ -z "$gh_out" ]] || printf '%s\n' "$gh_out" >&2
+[[ -z "$gh_err" ]] || printf '%s\n' "$gh_err" >&2
+if [[ $gh_status -ne 0 ]]; then
+  # The base can move after the check above, so gh can still refuse for a conflict.
+  if grep -qiE 'merge conflict|not mergeable' <<< "$gh_err"; then
+    base="$(gh pr view "$pr" --json baseRefName --jq .baseRefName 2>/dev/null || true)"
+    printf 'state=conflict\nnumber=%s\nbranch=%s\nsubject=\nreport=%s\n' "$number" "$branch" \
+      "$(factory_conflict_report "$number" "${base:-the base branch}")"
+    exit 0
+  fi
+  printf 'state=failed\nnumber=%s\nbranch=%s\nsubject=\nreport=merge failed: %s\n' "$number" "$branch" "$(factory_gh_error "$gh_err")"
+  exit 2
+fi
 printf 'state=merged\nnumber=%s\nbranch=%s\nsubject=%s (#%s)\nreport=pull request squash-merged\n' "$number" "$branch" "$subject" "$pr"

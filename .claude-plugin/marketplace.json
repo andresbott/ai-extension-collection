@@ -6,7 +6,7 @@
     "email": "contact@andresbott.com"
   },
   "description": "Claude Code extensions marketplace",
-  "version": "0.35.7",
+  "version": "0.35.8",
   "plugins": [
     {
       "name": "architects",

@@ -314,6 +314,8 @@ run() {
   stop() {
     local word='STOPPED' level=error report="${2:-$(why)}" what
     what="failed to $(stage_action "$1"): $report"
+    # A conflict is the user's to resolve, not a failed step; say it plainly.
+    [[ "$st" != conflict ]] || what="$report"
     if [[ "$merged" == yes ]]; then word='PARTIAL'; level=warning; what="PR #$number merged, but $what"; fi
     case "$1" in
       verify) printf -- '--- failure: verify (last %s lines)\n' "$FAIL_LINES"; tail -n "+$mark" "$log" | tail -n "$FAIL_LINES" ;;

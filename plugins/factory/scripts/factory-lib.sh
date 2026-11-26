@@ -132,6 +132,30 @@ factory_gh_error() {
   printf '%s\n' "${line:-gh gave no error message}" | cut -c1-300
 }
 
+# A pull request conflicts with its base: prints the base branch and returns 0.
+# Returns 1 when it merges cleanly, or GitHub cannot say. GitHub works out
+# mergeability lazily after a push and answers UNKNOWN until then, so ask again.
+factory_pr_conflicts() {
+  local attempt=1 mergeable base
+  while :; do
+    factory_gh_capture gh pr view "$1" --json mergeable,baseRefName --jq '[.mergeable,.baseRefName]|@tsv'
+    [[ $gh_status -eq 0 ]] || return 1
+    IFS=$'\t' read -r mergeable base <<< "$gh_out"
+    case "$mergeable" in
+      CONFLICTING) printf '%s\n' "${base:-the base branch}"; return 0 ;;
+      UNKNOWN) ;;
+      *) return 1 ;;
+    esac
+    (( attempt++ < ${FACTORY_MERGEABLE_ATTEMPTS:-5} )) || return 1
+    sleep "${FACTORY_MERGEABLE_DELAY:-3}"
+  done
+}
+
+# The report for a pull request that conflicts with its base.
+factory_conflict_report() {
+  printf 'pull request #%s has merge conflicts with %s; update the branch from %s, resolve them, and re-run' "$1" "$2" "$2"
+}
+
 # gh is installed and logged in to the remote's host. A bare `gh auth status`
 # checks every host gh knows, so a stale login on an unrelated host (another
 # GitHub Enterprise) would block this repo; it is only the fallback when the

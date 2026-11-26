@@ -136,6 +136,18 @@ grep -q '^--- FAIL: TestThing$' <<<"$out" || fail "failed log missing or not str
 pass "red CI stops before merge and returns failed checks and logs"
 
 fixture
+git -C "$repo" switch -qc feat/conflict
+printf 'conflict\n' >> "$repo/README.md"
+touch "$FAKE_GH/conflict"
+out="$(ship run --title 'feat: conflict' --body-stdin <<<'body')"
+grep -q '^STOPPED stage=wait-ci state=conflict report=pull request #7 has merge conflicts with main; ' <<<"$out" || fail "conflict: $out"
+[[ "$(result "$out")" == 'error: pull request #7 has merge conflicts with main; update the branch from main, resolve them, and re-run' ]] ||
+  fail "conflict result: $out"
+! grep -q '^pr checks' "$FAKE_GH/log" || fail "a conflicting PR must not wait for CI"
+[[ ! -f "$FAKE_GH/merge" ]] || fail "must not merge a conflicting PR"
+pass "a PR that conflicts with its base stops with a plain conflict report"
+
+fixture
 git -C "$repo" switch -qc feat/offline
 printf 'offline\n' >> "$repo/README.md"
 touch "$FAKE_GH/cidown"

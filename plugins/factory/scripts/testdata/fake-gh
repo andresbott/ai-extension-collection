@@ -57,6 +57,8 @@ case "${1:-} ${2:-}" in
       number,state,headRefName) printf '7\t%s\t%s\n' "$state" "$(cat "$s/head")" ;;
       number,state,title) printf '%s#7 %s\n' "${state,,}" "$(cat "$s/title")" ;;
       number) printf '7\n' ;;
+      # conflict: the PR does not merge cleanly into main.
+      mergeable,baseRefName) if [[ -f "$s/conflict" ]]; then printf 'CONFLICTING\tmain\n'; else printf 'MERGEABLE\tmain\n'; fi ;;
       title) cat "$s/title"; printf '\n' ;;
       headRefOid) cat "$s/oid" ;;
       body) cat "$s/body"; printf '\n' ;;
