@@ -53,7 +53,7 @@ genuinely hard to write.
 | Command | Arguments | Behaviour |
 |---|---|---|
 | `/factory:new-branch` | `[branch name]` | On `main`/`master`/the default branch, creates and checks out a feature branch; otherwise leaves the current branch unchanged. |
-| `/factory:open-pr` | `[branch name]` | branch → verify → commit → push → open (or reuse) PR → wait for CI; stops at green (`READY`). Never merges. |
+| `/factory:open-pr` | `[branch name] [target <base branch>]` | branch → verify → commit → push → open (or reuse) PR → wait for CI; stops at green (`READY`). Never merges. The PR targets the default branch unless `target` names another branch on `origin`. |
 | `/factory:ship` | `[branch name] [tag=<semver> \| no tag] [deleteRemote=true]` | The same flow, then squash-merge → sync main → cleanup → offer a release tag (never tags by default). |
 
 `open-pr` then `ship` is the review-first path: `open-pr` gets the PR green, and

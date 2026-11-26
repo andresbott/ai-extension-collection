@@ -46,7 +46,7 @@ const COMMANDS: [name: string, description: string, flow: Flow][] = [
   ["new-branch", "Move off main/master onto a feature branch (no-op on a feature branch)", newBranch],
   [
     "open-pr",
-    "Open (or reuse) a PR and wait for green CI: branch, verify, commit, push, open PR, watch CI. Never merges.",
+    "Open (or reuse) a PR and wait for green CI: branch, verify, commit, push, open PR, watch CI. Never merges. Args: [branch] [target <base branch>]",
     (deps, args) => ship(deps, args, "pr"),
   ],
   [

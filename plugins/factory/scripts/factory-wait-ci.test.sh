@@ -18,6 +18,14 @@ printf '%s\n' "$*" >> "$GH_LOG"
 case "${1:-} ${2:-}" in
   'pr view')
     [[ "${GH_SCENARIO:-}" != unresolved ]] || exit 1
+    if [[ "$*" == *mergeable* ]]; then
+      case "${GH_MERGEABLE:-MERGEABLE}" in
+        # late: GitHub answers UNKNOWN until its second ask, then finds a conflict.
+        late) (( $(grep -c 'mergeable' "$GH_LOG") >= 2 )) && printf 'CONFLICTING\tmain\n' || printf 'UNKNOWN\tmain\n' ;;
+        *) printf '%s\tmain\n' "${GH_MERGEABLE:-MERGEABLE}" ;;
+      esac
+      exit 0
+    fi
     printf '42\n'
     ;;
   'pr checks')
@@ -114,3 +122,14 @@ output="$( (cd "$repo" && PATH="$bin:$PATH" GH_LOG="$log" GH_SCENARIO=unresolved
 [[ "$output" == *'state=blocked'* ]] || fail "unresolved PR was not blocked: $output"
 ! grep -q '^pr checks' "$log" || fail "checks ran without a PR"
 printf 'PASS: unresolved PR is blocked\n'
+
+: > "$log"
+output="$( (cd "$repo" && PATH="$bin:$PATH" GH_LOG="$log" GH_MERGEABLE=CONFLICTING "$WAIT_SCRIPT" '42') 2>&1)" || fail "a conflicting PR should return safely: $output"
+[[ "$output" == *'state=conflict'* && "$output" == *'report=pull request #42 has merge conflicts with main; '* ]] || fail "conflict not reported: $output"
+! grep -q '^pr checks' "$log" || fail "checks were watched on a conflicting PR"
+printf 'PASS: a conflicting PR is reported instead of waiting for checks that never run\n'
+
+: > "$log"
+output="$( (cd "$repo" && PATH="$bin:$PATH" GH_LOG="$log" GH_MERGEABLE=late FACTORY_MERGEABLE_DELAY=0 "$WAIT_SCRIPT" '42') 2>&1)" || fail "a late conflict should return safely: $output"
+[[ "$output" == *'state=conflict'* ]] || fail "a conflict GitHub found after UNKNOWN was missed: $output"
+printf 'PASS: an UNKNOWN mergeability is asked again\n'
