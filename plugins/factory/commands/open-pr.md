@@ -1,6 +1,6 @@
 ---
 description: Open (or reuse) a PR for the current work and wait until CI is green — branch, verify, commit, push, open PR, watch CI. Does not merge; run /factory:ship afterwards to land it.
-argument-hint: "[branch name]"
+argument-hint: "[branch name] [target <base branch>]"
 model: haiku
 allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/scripts/ship.sh:*), Agent, AskUserQuestion
 ---

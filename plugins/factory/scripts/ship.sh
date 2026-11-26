@@ -2,6 +2,7 @@
 # Token-cheap ship flow. The model writes prose; this script does everything else.
 #
 #   ship.sh prepare [args]        preflight, run by the command's ! line (no mutation)
+#                                 with --for pr, `target <branch>` in args sets the PR base
 #   ship.sh draft --title T [--message M] --body-stdin
 #                                 store a PR draft (used by the pr-writer agent)
 #   ship.sh run [--branch n1 n2 ...] [--title T] [--message M] [--body-stdin]
@@ -104,9 +105,20 @@ acct() { sed -n "s/^$1=//p" <<< "$account_out" | tail -n 1; }
 prepare() {
   local for=ship
   if [[ "${1:-}" == --for ]]; then for="${2:-ship}"; shift 2; fi
-  local hint="${1:-}" current base ref mb protected=no pr=none pr_title='' dirty ahead files lines dirs need writer=cheap
+  local hint="${1:-}" target='' current base ref mb protected=no pr=none pr_title='' dirty ahead files lines dirs need writer=cheap
+  # `target <branch>` in the args picks the PR's base; the rest stays a branch-name hint.
+  if [[ "$hint" =~ (^|[[:space:]])target[[:space:]]+([^[:space:]]+) ]]; then
+    target="${BASH_REMATCH[2]}"
+    hint="${hint/"${BASH_REMATCH[0]}"/}"
+    hint="$(sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' <<< "$hint")"
+    [[ "$for" == pr ]] || fail "target works only with /factory:open-pr; /factory:ship always merges into the default branch"
+    git check-ref-format --branch "$target" >/dev/null 2>&1 || fail "target $target is not a valid branch name"
+  elif [[ "$hint" =~ (^|[[:space:]])target[[:space:]]*$ ]]; then
+    fail "target needs a branch name, as in: target main"
+  fi
   current="$(git branch --show-current)"
   [[ -n "$current" ]] || fail "detached HEAD"
+  [[ "$target" != "$current" ]] || fail "target $target is the current branch; a pull request needs a different base"
   git remote get-url origin >/dev/null 2>&1 || fail "no origin remote"
   factory_remote_default_unresolved origin && fail "default branch could not be resolved safely"
   factory_gh_authenticated origin || fail "GitHub CLI is unavailable or unauthenticated"
@@ -122,6 +134,18 @@ prepare() {
   esac
   base="$(factory_resolve_default_branch origin)"
   rm -rf "$draft_dir"
+  if [[ -n "$target" ]]; then
+    local found=0
+    git ls-remote --exit-code --heads origin "refs/heads/$target" >/dev/null 2>&1 || found=$?
+    [[ "$found" -ne 2 ]] || fail "target branch $target does not exist on origin"
+    [[ "$found" -eq 0 ]] || fail "origin could not be reached to check target branch $target"
+    # Only the remote-tracking ref moves, so the diff below is measured against the target.
+    git fetch --quiet origin "+refs/heads/$target:refs/remotes/origin/$target" 2>/dev/null ||
+      fail "target branch $target could not be fetched from origin"
+    base="$target"
+    # run reads it back, so the model never has to pass it.
+    mkdir -p "$draft_dir" && printf '%s' "$target" > "$draft_dir/base"
+  fi
 
   if factory_is_protected_branch "$current" origin; then
     protected=yes
@@ -165,6 +189,12 @@ prepare() {
       [[ "$dirty" -eq 0 ]] || fail "pull request ${pr%% *} is already merged; ship new work from a fresh branch off $base"
       need=none ;;
     open#*)
+      if [[ -n "$target" ]]; then
+        local pr_base
+        pr_base="$(gh pr view "$current" --json baseRefName --jq .baseRefName 2>/dev/null)"
+        [[ "$pr_base" == "$target" ]] ||
+          fail "pull request ${pr%% *} targets ${pr_base:-another branch}, not $target; change its base on GitHub or drop target"
+      fi
       if [[ "$dirty" -gt 0 ]]; then need=message; else need=none; fi
       # Hybrid subject: a saved one or a Conventional title needs no model; otherwise ask once.
       pr_title="${pr#* }"
@@ -387,6 +417,8 @@ run() {
   local pr_args=()
   [[ -n "$title" ]] && pr_args+=("title=$title")
   [[ -n "$body" ]] && pr_args+=("body=$body")
+  # The base prepare saved from `target <branch>`; without it, the default branch.
+  [[ "$until" == pr && -s "$draft_dir/base" ]] && pr_args+=("base=$(cat "$draft_dir/base")")
   step open-pr "$D/factory-open-pr.sh" "${pr_args[@]+"${pr_args[@]}"}"
   number="$(kv number)"; url="$(kv url)"
   # Squash subject: --subject, then the one saved in the PR body, then a Conventional title.

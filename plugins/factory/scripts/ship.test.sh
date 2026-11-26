@@ -243,6 +243,38 @@ grep -q -- '--subject feat: review me (#7)' "$FAKE_GH/merge" || fail "subject fr
 pass "open-pr stops at green CI; ship later merges the reused PR"
 
 fixture
+git -C "$repo" switch -qc banana
+printf 'banana\n' > "$repo/banana.txt"; git -C "$repo" add banana.txt; git -C "$repo" commit -qm banana
+git -C "$repo" push -q origin banana 2>/dev/null
+git -C "$repo" update-ref -d refs/remotes/origin/banana
+git -C "$repo" switch -qc feat/on-banana
+printf 'stacked\n' >> "$repo/README.md"; git -C "$repo" commit -qam 'feat: stacked'
+out="$(ship prepare --for pr 'target banana on-banana')"
+grep -q '^SHIP branch=feat/on-banana protected=no base=banana pr=none dirty=0 ahead=1 files=1 ' <<<"$out" || fail "target prepare: $out"
+grep -q '^args: on-banana$' <<<"$out" || fail "target must be removed from the branch hint: $out"
+out="$(ship open-pr --title 'feat: stacked' --body-stdin <<<'body')"
+grep -q '^READY pr=#7 ' <<<"$out" || fail "target open-pr: $out"
+[[ "$(cat "$FAKE_GH/base")" == banana ]] || fail "PR base: $(cat "$FAKE_GH/base" 2>/dev/null)"
+out="$(ship prepare --for pr 'target banana')"
+grep -q 'pr=open#7_feat:_stacked .* need=none ' <<<"$out" || fail "reused PR on its target: $out"
+out="$(ship prepare --for pr 'target main')"
+[[ "$(result "$out")" == 'error: pull request open#7 targets banana, not main; change its base on GitHub or drop target' ]] ||
+  fail "PR on another base: $out"
+pass "open-pr with target opens the PR against that branch and measures the change from it"
+
+out="$(ship prepare --for pr 'target nope')"
+[[ "$(result "$out")" == 'error: target branch nope does not exist on origin' ]] || fail "missing target: $out"
+out="$(ship prepare --for pr 'target')"
+[[ "$(result "$out")" == 'error: target needs a branch name, as in: target main' ]] || fail "bare target: $out"
+out="$(ship prepare --for pr 'target feat/on-banana')"
+grep -q '^error: target feat/on-banana is the current branch' <<<"$out" || fail "target is current: $out"
+out="$(ship prepare 'target banana')"
+grep -q '^error: target works only with /factory:open-pr' <<<"$out" || fail "ship with target: $out"
+out="$(ship prepare --for pr 'targets-fix')"
+! grep -q '^error:' <<<"$out" || fail "a word starting with target is only a hint: $out"
+pass "a bad target, or one passed to ship, fails before any change"
+
+fixture
 git -C "$repo" switch -qc feat/prose
 printf 'prose\n' >> "$repo/README.md"
 out="$(ship run --title 'Add a prose title' --subject 'feat(readme): add prose' --body-stdin <<<'## Summary
