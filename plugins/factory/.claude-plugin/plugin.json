@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "factory",
   "description": "Delivery commands, from writing code to merging it. /auto-deliver hands the rest of the feature in the conversation to the agent, which stops only for critical issues; it runs the same delivery engine as /next-iteration. /auto-improve reviews the current branch and fixes each finding with a fresh subagent, unattended. /next-iteration implements every task in state ready in the todo list (only through the todo binary), plus followup tasks an expert subagent can clear without the user, settles open questions up front, builds them with specialized subagents, and commits on the current branch. /review-pr checks a GitHub pull request out into a separate worktree, has picked reviewer subagents review it, verifies their findings, and prints one review without posting it; an exhaustive mode runs three independent teams and keeps only shared findings or confirmed blockers. /review-branch runs the same review engine on the current branch, uncommitted work included, then offers to fix the chosen findings through the delivery engine, each fix starting from a failing test. Token-cheap Git commands for Claude Code (on haiku) and pi, backed by bundled scripts: `/factory:new-branch` leaves main; `/factory:open-pr` opens a PR and waits for green CI; `/factory:ship` runs the full flow through merge, sync, cleanup, and an opt-in tag prompt. An expensive PR writer is used only for complex changes. `/factory:generate-readme` creates or updates the root README.md and DEVELOPMENT.md.",
-  "version": "0.5.9",
+  "version": "0.5.10",
   "author": {
     "name": "Andres Bott",
     "email": "contact@andresbott.com"

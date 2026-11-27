@@ -230,8 +230,8 @@ fixture
 git -C "$repo" switch -qc feat/review
 printf 'review me\n' >> "$repo/README.md"
 out="$(ship open-pr --title 'feat: review me' --body-stdin <<<'body')"
-grep -q '^READY pr=#7 url=https://github.com/o/r/pull/7 ci=green ' <<<"$out" || fail "open-pr: $out"
-[[ "$(result "$out")" == 'success: PR #7 is ready: CI is green; run /factory:ship to merge' ]] || fail "open-pr result: $out"
+grep -q '^READY pr=#7 url=https://github.com/o/r/pull/7 base=main ci=green ' <<<"$out" || fail "open-pr: $out"
+[[ "$(result "$out")" == 'success: PR #7 into main is ready: CI is green; run /factory:ship to merge' ]] || fail "open-pr result: $out"
 [[ ! -f "$FAKE_GH/merge" ]] || fail "open-pr must not merge"
 [[ "$(on)" == feat/review ]] || fail "open-pr must stay on the branch"
 out="$(ship prepare '')"
@@ -249,11 +249,15 @@ git -C "$repo" push -q origin banana 2>/dev/null
 git -C "$repo" update-ref -d refs/remotes/origin/banana
 git -C "$repo" switch -qc feat/on-banana
 printf 'stacked\n' >> "$repo/README.md"; git -C "$repo" commit -qam 'feat: stacked'
-out="$(ship prepare --for pr 'target banana on-banana')"
-grep -q '^SHIP branch=feat/on-banana protected=no base=banana pr=none dirty=0 ahead=1 files=1 ' <<<"$out" || fail "target prepare: $out"
-grep -q '^args: on-banana$' <<<"$out" || fail "target must be removed from the branch hint: $out"
+for form in 'against banana' 'into banana' 'base banana' 'base=banana' 'target=banana' 'target banana'; do
+  out="$(ship prepare --for pr "$form")"
+  grep -q '^SHIP branch=feat/on-banana protected=no base=banana pr=none dirty=0 ahead=1 files=1 ' <<<"$out" ||
+    fail "target prepare ($form): $out"
+done
 out="$(ship open-pr --title 'feat: stacked' --body-stdin <<<'body')"
-grep -q '^READY pr=#7 ' <<<"$out" || fail "target open-pr: $out"
+grep -q '^READY pr=#7 url=https://github.com/o/r/pull/7 base=banana ' <<<"$out" || fail "target open-pr: $out"
+[[ "$(result "$out")" == 'success: PR #7 into banana is ready: CI is green; run /factory:ship to merge' ]] ||
+  fail "target open-pr result: $out"
 [[ "$(cat "$FAKE_GH/base")" == banana ]] || fail "PR base: $(cat "$FAKE_GH/base" 2>/dev/null)"
 out="$(ship prepare --for pr 'target banana')"
 grep -q 'pr=open#7_feat:_stacked .* need=none ' <<<"$out" || fail "reused PR on its target: $out"
@@ -270,8 +274,19 @@ out="$(ship prepare --for pr 'target feat/on-banana')"
 grep -q '^error: target feat/on-banana is the current branch' <<<"$out" || fail "target is current: $out"
 out="$(ship prepare 'target banana')"
 grep -q '^error: target works only with /factory:open-pr' <<<"$out" || fail "ship with target: $out"
+out="$(ship prepare --for pr 'base=')"
+[[ "$(result "$out")" == 'error: base needs a branch name, as in: target main' ]] || fail "empty base=: $out"
+out="$(ship prepare --for pr 'depl/release-mcp')"
+[[ "$(result "$out")" == 'error: unused arguments: depl/release-mcp; already on feat/on-banana, so only target <branch> is understood' ]] ||
+  fail "unused args on a feature branch: $out"
 out="$(ship prepare --for pr 'targets-fix')"
-! grep -q '^error:' <<<"$out" || fail "a word starting with target is only a hint: $out"
+grep -q '^error: unused arguments: targets-fix;' <<<"$out" || fail "a word starting with target is not a target: $out"
+git -C "$repo" switch -q main
+printf 'on main\n' >> "$repo/README.md"
+out="$(ship prepare --for pr 'against banana fix-readme')"
+grep -q '^SHIP branch=main protected=yes base=banana ' <<<"$out" || fail "target from main: $out"
+grep -q '^args: fix-readme$' <<<"$out" || fail "target must be removed from the branch hint: $out"
+git -C "$repo" checkout -q -- README.md
 pass "a bad target, or one passed to ship, fails before any change"
 
 fixture
