@@ -6,7 +6,7 @@
     "email": "contact@andresbott.com"
   },
   "description": "Claude Code extensions marketplace",
-  "version": "0.35.10",
+  "version": "0.36.0",
   "plugins": [
     {
       "name": "architects",
@@ -26,7 +26,7 @@
     {
       "name": "factory",
       "source": "./plugins/factory",
-      "description": "Delivery commands from writing code to merging it. /auto-deliver hands off the rest of a feature, /auto-improve runs an unattended review-and-fix pass on the current branch, /next-iteration builds the ready tasks from the todo list, /review-pr prints a multi-reviewer review of a pull request without posting it, and /review-branch reviews the current branch with uncommitted work and offers to fix the findings. Token-cheap, script-backed Git commands (/new-branch, /open-pr, /ship) branch, open the PR, wait for CI, and merge, using an expensive PR writer only for complex changes. /generate-readme writes the root README.md and DEVELOPMENT.md."
+      "description": "Delivery commands from writing code to merging it. /auto-deliver hands off the rest of a feature, /auto-improve runs an unattended review-and-fix pass on the current branch, /next-iteration builds the ready tasks from the todo list, /qualify-sprint prepares a sprint for it by refining, sizing, and settling every task's questions up front, /review-pr prints a multi-reviewer review of a pull request without posting it, and /review-branch reviews the current branch with uncommitted work and offers to fix the findings. Token-cheap, script-backed Git commands (/new-branch, /open-pr, /ship) branch, open the PR, wait for CI, and merge, using an expensive PR writer only for complex changes. /generate-readme writes the root README.md and DEVELOPMENT.md."
     },
     {
       "name": "go-idioms",
