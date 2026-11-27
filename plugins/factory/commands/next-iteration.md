@@ -74,6 +74,24 @@ up like any other `ready` task, with these differences:
 - **If nothing is clearly open** (every subtask done and no new text from the
   user), ask in step 1 what is left to do.
 
+## Tasks qualified ahead of time
+
+`/factory:qualify-sprint` prepares tasks before this run and records its
+work in `[qualify-sprint <YYYY-MM-DD>]` blocks. Read them like your own
+`[next-iteration ...]` blocks: the text inside is not the user's words,
+except its "Answer:" quotes, and its "Decided:" notes stand unless the
+user's text overrules them. In step 1 of the engine:
+
+- **Use what it recorded.** Its `Scope:` and `Size:` are the starting point
+  for the understanding subagent and for grouping; regroup only if the code
+  has changed so that they no longer fit. Its `Depends on:` orders the
+  groups. Its `Breaking changes:` answer is the breaking-change answer for
+  that task: do not ask it again.
+- **Ask only what is new.** Its decided and answered questions are not open
+  questions. Qualify and ask only what the subagent finds that the block
+  does not settle. When nothing is left for the user, say you are starting
+  and start, without waiting.
+
 ## Follow-ups from earlier runs
 
 Step 0 also collects every task in `followup`. At the start of the engine's

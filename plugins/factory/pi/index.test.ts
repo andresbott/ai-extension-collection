@@ -92,6 +92,7 @@ test("registers the factory commands", () => {
     "factory:auto-deliver",
     "factory:auto-improve",
     "factory:next-iteration",
+    "factory:qualify-sprint",
     "factory:review-branch",
     "factory:review-pr",
     "factory:new-branch",
